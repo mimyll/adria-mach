@@ -81,3 +81,23 @@ async def loopback():
     yield start
     for runner in reversed(runners):
         await runner.cleanup()
+
+
+@pytest.fixture
+def vehicle_snapshot(position_snapshot):
+    data = deepcopy(position_snapshot)
+    data["configuration"]["system"] = {
+        "vehicle": {
+            "model": "Example 700 (Test)",
+            "chassis": {"number": "000-TEST-CHASSIS", "id": "DO-NOT-USE"},
+            "properties": {"vehicleLength": 9999},
+            "equipment": [
+                {"key": "B11", "value": "2710"},
+                {"key": "B13", "value": 7123},
+                {"key": "B12", "value": "8543.5"},
+                {"key": "B15", "value": 2310.25},
+                {"key": "UNREVIEWED", "value": "PRIVATE-EXTRA"},
+            ],
+        }
+    }
+    return data

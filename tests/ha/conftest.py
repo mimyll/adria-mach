@@ -26,6 +26,9 @@ def backend(monkeypatch, full_snapshot):
     state.control_snapshots = {}
     state.capabilities = None
     state.location = None
+    from custom_components.adria_mach.client.vehicle import VehicleInfo
+
+    state.vehicle = VehicleInfo()
 
     class Client:
         def __init__(self):
@@ -49,6 +52,7 @@ def backend(monkeypatch, full_snapshot):
                 state.control_snapshots,
                 state.capabilities,
                 state.location,
+                state.vehicle,
             )
 
         async def close(self):

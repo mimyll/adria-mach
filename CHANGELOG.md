@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0
+
+- Add read-only vehicle model, chassis number and four reported dimensions in millimetres.
+- Keep vehicle metadata out of integration diagnostics; the chassis-number entity is disabled by default.
+- Preserve existing entities, settings, location tracking and command history.
+
 ## 0.12.0
 
 - Add longitudinal and lateral levelling angles using reported mounting and calibration data.

@@ -477,3 +477,96 @@ async def test_native_position_lifecycle_preserves_identity_and_private_location
     assert dict(entry.options) == options
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert all(client.closed for client in backend.clients)
+
+
+async def test_native_vehicle_information_is_private_additive_and_read_only(
+    hass, backend, vehicle_snapshot
+):
+    import json
+
+    from homeassistant.const import EntityCategory
+
+    from custom_components.adria_mach.client.position import Location
+    from custom_components.adria_mach.client.vehicle import VehicleInfo, vehicle_from
+    from custom_components.adria_mach.diagnostics import async_get_config_entry_diagnostics
+
+    backend.location = Location(10.125, -20.25)
+    entry = entry_for(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    tracker = registry.async_get_entity_id("device_tracker", DOMAIN, "synthetic-a_location")
+    registry.async_update_entity(tracker, disabled_by=None)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    old_entity = temperature_state(hass).entity_id
+    registry.async_update_entity(old_entity, name="Owner room", icon="mdi:home")
+    old = {
+        e.entity_id: (e.unique_id, e.device_id, e.disabled_by, e.name, e.icon)
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+    options = dict(entry.options)
+    device = dr.async_get(hass).async_get(registry.async_get(old_entity).device_id)
+    device_before = (device.id, device.model, device.serial_number, device.identifiers)
+    reads = backend.reads
+    backend.vehicle = vehicle_from(vehicle_snapshot["configuration"])
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert backend.reads == reads + 1
+    entities = {
+        key: registry.async_get_entity_id("sensor", DOMAIN, "synthetic-a_" + key)
+        for key in backend.vehicle.values
+    }
+    chassis = entities["chassis_number"]
+    assert registry.async_get(chassis).disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert hass.states.get(chassis) is None
+    registry.async_update_entity(chassis, disabled_by=None)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    for key, entity_id in entities.items():
+        state = hass.states.get(entity_id)
+        assert registry.async_get(entity_id).entity_category is EntityCategory.DIAGNOSTIC
+        assert registry.async_get(entity_id).device_id == device.id
+        assert state.state == str(backend.vehicle.values[key])
+        assert "state_class" not in state.attributes
+        numeric = key not in ("vehicle_model", "chassis_number")
+        assert state.attributes.get("device_class") == ("distance" if numeric else None)
+        assert state.attributes.get("unit_of_measurement") == ("mm" if numeric else None)
+    assert "000-TEST-CHASSIS" not in json.dumps(
+        await async_get_config_entry_diagnostics(hass, entry), default=str
+    )
+    assert all(
+        "000-TEST-CHASSIS" not in json.dumps(hass.states.get(e).attributes, default=str)
+        for e in old
+    )
+    backend.vehicle = VehicleInfo({"vehicle_model": "Example 701"})
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(chassis).state == "unavailable"
+    assert hass.states.get(entities["vehicle_length"]).state == "unavailable"
+    assert hass.states.get(entities["vehicle_model"]).state == "Example 701"
+    backend.read_error = MachError("transport_failure")
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(entities["vehicle_model"]).state == "unavailable"
+    backend.read_error = None
+    backend.vehicle = vehicle_from(vehicle_snapshot["configuration"])
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(chassis).state == "000-TEST-CHASSIS"
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == len(old) + 6
+    assert {
+        e: (
+            registry.async_get(e).unique_id,
+            registry.async_get(e).device_id,
+            registry.async_get(e).disabled_by,
+            registry.async_get(e).name,
+            registry.async_get(e).icon,
+        )
+        for e in old
+    } == old
+    device = dr.async_get(hass).async_get(device.id)
+    assert (device.id, device.model, device.serial_number, device.identifiers) == device_before
+    assert dict(entry.options) == options
+    assert hass.states.get(tracker).attributes["latitude"] == 10.125
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert all(client.closed for client in backend.clients)

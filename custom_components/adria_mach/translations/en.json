@@ -153,6 +153,24 @@
       },
       "levelling_roll": {
         "name": "Lateral tilt"
+      },
+      "vehicle_model": {
+        "name": "Vehicle model"
+      },
+      "chassis_number": {
+        "name": "Chassis number"
+      },
+      "vehicle_height": {
+        "name": "Vehicle height"
+      },
+      "vehicle_length": {
+        "name": "Vehicle length"
+      },
+      "vehicle_length_with_towbar": {
+        "name": "Vehicle length including towbar"
+      },
+      "vehicle_width": {
+        "name": "Vehicle width"
       }
     },
     "binary_sensor": {

@@ -11,12 +11,14 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
+    UnitOfLength,
     UnitOfPressure,
     UnitOfTemperature,
 )
 
 from .client.position import ANGLE_KEYS
 from .client.telemetry import POWER_STATES, SIM_STATES
+from .client.vehicle import DIMENSIONS
 from .const import VALUE_ID
 from .entity import MachEntity, async_discover_diagnostics
 
@@ -165,6 +167,27 @@ LEVELLING_SENSORS = tuple(
     for key in ANGLE_KEYS
 )
 
+VEHICLE_SENSORS = (
+    SensorEntityDescription(
+        key="vehicle_model", translation_key="vehicle_model", icon="mdi:caravan"
+    ),
+    SensorEntityDescription(
+        key="chassis_number",
+        translation_key="chassis_number",
+        icon="mdi:identifier",
+        entity_registry_enabled_default=False,
+    ),
+    *(
+        SensorEntityDescription(
+            key=key,
+            translation_key=key,
+            device_class=SensorDeviceClass.DISTANCE,
+            native_unit_of_measurement=UnitOfLength.MILLIMETERS,
+        )
+        for key in DIMENSIONS
+    ),
+)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = entry.runtime_data
@@ -183,6 +206,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
     )
     async_discover_diagnostics(entry, DIAGNOSTIC_SENSORS, MachDiagnosticSensor, async_add_entities)
     async_discover_diagnostics(entry, LEVELLING_SENSORS, MachSensor, async_add_entities)
+    async_discover_diagnostics(
+        entry,
+        VEHICLE_SENSORS,
+        MachVehicleSensor,
+        async_add_entities,
+        present=lambda description: coordinator.data.vehicle.values.get(description.key)
+        is not None,
+    )
 
 
 class MachSensor(MachEntity, SensorEntity):
@@ -200,6 +231,12 @@ class MachDiagnosticSensor(MachSensor):
         if value is not None and self.entity_description.device_class is SensorDeviceClass.ENUM:
             return value.lower()
         return value
+
+
+class MachVehicleSensor(MachDiagnosticSensor):
+    @property
+    def reading(self):
+        return self.coordinator.data.vehicle.values.get(self.entity_description.key)
 
 
 class MachLastReadSensor(MachSensor):

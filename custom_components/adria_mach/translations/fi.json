@@ -153,6 +153,24 @@
       },
       "levelling_roll": {
         "name": "Sivuttaiskallistuma"
+      },
+      "vehicle_model": {
+        "name": "Vaunun malli"
+      },
+      "chassis_number": {
+        "name": "Alustanumero"
+      },
+      "vehicle_height": {
+        "name": "Vaunun korkeus"
+      },
+      "vehicle_length": {
+        "name": "Vaunun pituus"
+      },
+      "vehicle_length_with_towbar": {
+        "name": "Vaunun kokonaispituus vetokoukkuineen"
+      },
+      "vehicle_width": {
+        "name": "Vaunun leveys"
       }
     },
     "binary_sensor": {

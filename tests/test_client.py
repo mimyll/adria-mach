@@ -149,8 +149,9 @@ def observe_stream(client, responses, monkeypatch):
 
 
 async def test_complete_reader_only_reads_assigned_vehicle_and_keeps_stream_open(
-    scenario, monkeypatch
+    scenario, monkeypatch, full_snapshot, vehicle_snapshot
 ):
+    full_snapshot["configuration"]["system"] = vehicle_snapshot["configuration"]["system"]
     calls, responses, _ = scenario
     client = portal.MachClient()
     observe_stream(client, responses, monkeypatch)
@@ -168,6 +169,8 @@ async def test_complete_reader_only_reads_assigned_vehicle_and_keeps_stream_open
         assert result.values["AIR_HEATER_VALUE"] is False
         assert len(result.values) == 18
         assert result.received_at.tzinfo is not None
+        assert result.vehicle.values["vehicle_model"] == "Example 700 (Test)"
+        assert result.vehicle.values["vehicle_length_with_towbar"] == 8543.5
         assert [(method, path) for method, path, _ in calls] == [
             ("POST", "/api/login/login"),
             ("POST", "/api/user/listMyDevices"),
@@ -921,6 +924,120 @@ def test_lte_readonly_projection_accepts_optional_writability(diagnostic_snapsho
 def set_position(data, **updates):
     for key, value in updates.items():
         next(row for row in data["values"]["values"] if row["device"] == key)["status"] = value
+
+
+async def test_vehicle_metadata_mapping_privacy_and_snapshot_replacement(vehicle_snapshot):
+    from dataclasses import FrozenInstanceError
+
+    from custom_components.adria_mach.client.vehicle import VehicleInfo
+
+    config, values = vehicle_snapshot["configuration"], vehicle_snapshot["values"]
+    expected = {
+        "vehicle_model": "Example 700 (Test)",
+        "chassis_number": "000-TEST-CHASSIS",
+        "vehicle_height": 2710,
+        "vehicle_length": 7123,
+        "vehicle_length_with_towbar": 8543.5,
+        "vehicle_width": 2310.25,
+    }
+    result = portal.MachClient.measurement(config, values, "synthetic-a")
+    assert dict(result.vehicle.values) == expected
+    assert result.temperature == 0 and result.location is not None
+    assert result.values["levelling_pitch"] == 0
+    assert not set(expected) & result.values.keys()
+    assert "000-TEST-CHASSIS" not in repr(result) + repr(result.vehicle)
+    copy = VehicleInfo(expected)
+    expected["chassis_number"] = "CHANGED"
+    assert copy.values["chassis_number"] == "000-TEST-CHASSIS"
+    with pytest.raises(TypeError):
+        copy.values["chassis_number"] = "CHANGED"
+    with pytest.raises(FrozenInstanceError):
+        copy.values = {}
+    config["system"]["vehicle"]["equipment"] = []
+    config["system"]["vehicle"]["chassis"] = {"id": "DO-NOT-USE"}
+    missing = portal.MachClient.measurement(config, values, "synthetic-a")
+    assert missing.vehicle.values["chassis_number"] is None
+    assert missing.vehicle.values["vehicle_length"] is None  # No properties fallback.
+    assert missing.vehicle.values["vehicle_model"] == "Example 700 (Test)"
+    config["system"]["vehicle"]["equipment"] = [{"key": "B13", "value": "7000"}]
+    assert (
+        portal.MachClient.measurement(config, values, "synthetic-a").vehicle.values[
+            "vehicle_length"
+        ]
+        == 7000
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        True,
+        None,
+        0,
+        -1,
+        math.nan,
+        math.inf,
+        -9007199254740991,
+        5e-324,
+        10**400,
+        "2710 mm",
+        "1e3",
+        "1,5",
+        " 1",
+        "1\n",
+        [],
+        {},
+        "9" * 400,
+    ],
+)
+def test_vehicle_dimension_rejects_invalid_values_without_hiding_siblings(
+    vehicle_snapshot, invalid
+):
+    from custom_components.adria_mach.client.vehicle import vehicle_from
+
+    config = vehicle_snapshot["configuration"]
+    config["system"]["vehicle"]["equipment"][0]["value"] = invalid
+    actual = vehicle_from(config).values
+    assert actual["vehicle_height"] is None
+    assert actual["vehicle_width"] == 2310.25
+
+
+@pytest.mark.parametrize("bad_path", ["system", "vehicle", "chassis", "equipment", "duplicate"])
+async def test_vehicle_malformed_optional_groups_are_isolated(vehicle_snapshot, bad_path):
+    config, values = vehicle_snapshot["configuration"], vehicle_snapshot["values"]
+    if bad_path == "system":
+        config["system"] = []
+    elif bad_path == "vehicle":
+        config["system"]["vehicle"] = "invalid"
+    elif bad_path == "duplicate":
+        config["system"]["vehicle"]["equipment"].append({"key": "B11", "value": "2710"})
+    else:
+        config["system"]["vehicle"][bad_path] = "invalid"
+    result = portal.MachClient.measurement(config, values, "synthetic-a")
+    assert result.temperature == 0 and result.location is not None
+    assert result.values["levelling_roll"] == 0
+    if bad_path in ("system", "vehicle"):
+        assert not result.vehicle.values
+    elif bad_path == "chassis":
+        assert result.vehicle.values["chassis_number"] is None
+        assert result.vehicle.values["vehicle_height"] == 2710
+    else:
+        assert result.vehicle.values["vehicle_height"] is None
+        assert result.vehicle.values["chassis_number"] == "000-TEST-CHASSIS"
+
+
+@pytest.mark.parametrize(
+    "invalid", [None, 123, "", " ", "x" * 101, "Bad\ntext", "<private>", "Bad\x00text"]
+)
+def test_vehicle_text_rejects_invalid_data(vehicle_snapshot, invalid):
+    from custom_components.adria_mach.client.vehicle import vehicle_from
+
+    config = vehicle_snapshot["configuration"]
+    config["system"]["vehicle"]["model"] = invalid
+    config["system"]["vehicle"]["chassis"]["number"] = invalid
+    actual = vehicle_from(config).values
+    assert actual["vehicle_model"] is None and actual["chassis_number"] is None
+    assert actual["vehicle_height"] == 2710
 
 
 @pytest.mark.parametrize(

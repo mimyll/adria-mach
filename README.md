@@ -21,6 +21,8 @@ New releases appear under **Settings → Updates**. Read the release notes, inst
 
 ## Limitations
 
+- Vehicle specifications depend on reported data. The **Chassis number** entity is disabled by default; enable it if wanted. Home Assistant may record it, but integration diagnostics exclude it. Dimensions are reported specifications, not measured travel clearance.
+
 - Vehicle location is disabled by default. Enable the **Location** entity to show it on the Home Assistant map; Home Assistant may record its history. Coordinates are excluded from integration diagnostics. Levelling angles use the latest shared snapshot; they do not reproduce the MACH app’s animated smoothing or calibrate the vehicle.
 
 - Network and installed-version diagnostics depend on the fields reported by the device. LTE enabled is a setting, not proof of internet connectivity. Firmware update availability and installation are not supported.

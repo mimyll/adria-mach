@@ -201,6 +201,7 @@ class MachClient:
         from .operational import CURRENT_CONTROLS, equipment_snapshot
         from .outside import OutsideControl
         from .position import location_from
+        from .vehicle import vehicle_from
 
         controls = {}
         readings = readings_from(configuration, values, levelling)
@@ -267,6 +268,7 @@ class MachClient:
                 location_available=location is not None,
             ),
             location,
+            vehicle_from(configuration),
         )
 
     async def command(

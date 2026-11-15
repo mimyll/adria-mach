@@ -11,6 +11,7 @@ from ..const import VALUE_ID
 from .catalog import FIELDS, Field
 from .position import Levelling, Location
 from .telemetry import diagnostic_readings
+from .vehicle import VehicleInfo
 
 
 class MachError(Exception):
@@ -34,6 +35,7 @@ class Measurement:
     control_snapshots: Mapping[str, Any] = field(default_factory=dict, repr=False)
     capabilities: Any = field(default=None, repr=False)
     location: Location | None = field(default=None, repr=False)
+    vehicle: VehicleInfo = field(default_factory=VehicleInfo, repr=False)
 
     def __post_init__(self):
         object.__setattr__(self, "values", MappingProxyType(dict(self.values)))

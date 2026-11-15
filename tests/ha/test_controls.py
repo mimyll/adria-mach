@@ -191,7 +191,7 @@ def manual_snapshots(backend):
 async def test_native_entities_routine_outside_and_full_target_slider(hass, native_controls):
     entry, backend, light, number = native_controls
     registered = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
-    assert len(registered) == 20 and len({e.device_id for e in registered}) == 1
+    assert len(registered) == 21 and len({e.device_id for e in registered}) == 1
     assert not backend.commands
     assert hass.states.get(light).attributes["supported_color_modes"] == ["onoff"]
     n = hass.states.get(number)
@@ -777,7 +777,7 @@ async def test_native_dimming_keeps_registry_and_reports_observed_levels(hass, n
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     registered = er.async_entries_for_config_entry(registry, entry.entry_id)
-    assert len(registered) == 28 and not backend.commands
+    assert len(registered) == 29 and not backend.commands
     full_identity = {
         e.entity_id: (
             e.unique_id,
@@ -1009,7 +1009,7 @@ async def test_water_mode_only_native_services_preserve_existing_twenty_eight(
         }
 
     before = identities()
-    assert len(before) == 28
+    assert len(before) == 29
     backend.control_snapshots[WaterControl.MODE.value] = Snapshot(
         {WaterControl.MODE.key: "normal"},
         {},
@@ -1021,7 +1021,7 @@ async def test_water_mode_only_native_services_preserve_existing_twenty_eight(
     water = registry.async_get_entity_id(
         "water_heater", DOMAIN, "synthetic-a_" + WaterControl.MODE.key
     )
-    assert water and len(identities()) == 29
+    assert water and len(identities()) == 30
     assert before == {key: value for key, value in identities().items() if key in before}
     state = hass.states.get(water)
     assert state.state == "normal" and state.attributes["operation_list"] == [
@@ -1061,7 +1061,7 @@ async def test_water_mode_only_native_services_preserve_existing_twenty_eight(
     await hass.async_block_till_done()
     assert len(backend.commands) == 3
     assert before == {key: value for key, value in identities().items() if key in before}
-    assert len(identities()) == 29
+    assert len(identities()) == 30
 
 
 @pytest.mark.parametrize("native_controls", [(WaterControl.MODE,)], indirect=True)
@@ -1145,10 +1145,10 @@ async def test_climate_and_inventory_preserve_all_twenty_nine(hass, native_contr
         }
 
     before = identities()
-    assert len(before) == 29
+    assert len(before) == 30
     configuration = (dict(entry.data), dict(entry.options))
     climate = await add_native_climate(hass, entry, backend, full_snapshot)
-    assert climate and len(identities()) == 31
+    assert climate and len(identities()) == 32
     assert before == {k: v for k, v in identities().items() if k in before}
     assert configuration == (dict(entry.data), dict(entry.options))
     state = hass.states.get(climate)

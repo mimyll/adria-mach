@@ -9,6 +9,7 @@ from typing import Any
 
 from ..const import VALUE_ID
 from .catalog import FIELDS, Field
+from .telemetry import diagnostic_readings
 
 
 class MachError(Exception):
@@ -119,4 +120,4 @@ def readings_from(configuration: Any, values: Any) -> dict[str, int | float | st
         key: _reading(rows, key, field)
         for key, field in FIELDS.items()
         if _supported(definitions, key, field)
-    }
+    } | diagnostic_readings(configuration, values)

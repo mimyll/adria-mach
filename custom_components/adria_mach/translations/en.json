@@ -75,6 +75,78 @@
       },
       "capability_inventory": {
         "name": "Capability inventory"
+      },
+      "mobile_operator": {
+        "name": "Mobile operator"
+      },
+      "mobile_technology": {
+        "name": "Mobile network technology"
+      },
+      "network_registration": {
+        "name": "Network registration status"
+      },
+      "mobile_signal_quality": {
+        "name": "Mobile signal quality"
+      },
+      "sim_status": {
+        "name": "SIM status",
+        "state": {
+          "sim_ready": "Ready",
+          "sim_not_inserted": "SIM not inserted",
+          "incorrect_password": "Incorrect password",
+          "network_registration_failed": "Network registration failed",
+          "incorrect_apn": "Incorrect APN",
+          "incorrect_pdp_authentication": "PDP authentication failed",
+          "sim_pin": "SIM PIN required",
+          "sim_pin2": "SIM PIN2 required",
+          "sim_puk": "SIM PUK required",
+          "sim_puk2": "SIM PUK2 required",
+          "ph_sim_pin": "PH SIM PIN required",
+          "ph_fsim_pin": "PH FSIM PIN required",
+          "ph_fsim_puk": "PH FSIM PUK required",
+          "ph_net_pin": "PH NET PIN required",
+          "ph_net_puk": "PH NET PUK required",
+          "ph_netsub_pin": "PH NETSUB PIN required",
+          "ph_netsub_puk": "PH NETSUB PUK required",
+          "ph_sp_pin": "PH SP PIN required",
+          "ph_sp_puk": "PH SP PUK required",
+          "ph_corp_pin": "PH CORP PIN required",
+          "ph_corp_puk": "PH CORP PUK required"
+        }
+      },
+      "device_power_mode": {
+        "name": "Device power mode",
+        "state": {
+          "on": "On",
+          "sleep": "Sleep",
+          "hibernation": "Hibernation",
+          "charging": "Charging",
+          "shutdown": "Shutdown"
+        }
+      },
+      "mach_software_version": {
+        "name": "MACH software version"
+      },
+      "mach_os_release": {
+        "name": "MACH OS release"
+      },
+      "mach_release_channel": {
+        "name": "MACH release channel"
+      },
+      "io_firmware_version": {
+        "name": "IO firmware version"
+      },
+      "mcu_1_firmware_version": {
+        "name": "MCU 1 firmware version"
+      },
+      "mcu_2_firmware_version": {
+        "name": "MCU 2 firmware version"
+      },
+      "panel_firmware_version": {
+        "name": "Panel firmware version"
+      },
+      "last_successful_read": {
+        "name": "Last successful read"
       }
     },
     "binary_sensor": {
@@ -101,6 +173,12 @@
       },
       "aux_enabled": {
         "name": "AUX state"
+      },
+      "lte_enabled": {
+        "name": "LTE enabled"
+      },
+      "roaming_permitted": {
+        "name": "Roaming permitted"
       }
     },
     "light": {

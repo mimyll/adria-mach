@@ -17,6 +17,7 @@ FILES = (
     "client/catalog.py",
     "client/capabilities.py",
     "client/model.py",
+    "client/telemetry.py",
     "client/outside.py",
     "client/control_model.py",
     "client/commands.py",

@@ -75,6 +75,78 @@
       },
       "capability_inventory": {
         "name": "Kyvykkyysluettelo"
+      },
+      "mobile_operator": {
+        "name": "Matkapuhelinoperaattori"
+      },
+      "mobile_technology": {
+        "name": "Mobiiliverkon tekniikka"
+      },
+      "network_registration": {
+        "name": "Verkkoon rekisteröitymisen tila"
+      },
+      "mobile_signal_quality": {
+        "name": "Mobiilisignaalin laatu"
+      },
+      "sim_status": {
+        "name": "SIM-kortin tila",
+        "state": {
+          "sim_ready": "Valmis",
+          "sim_not_inserted": "SIM-kortti puuttuu",
+          "incorrect_password": "Virheellinen salasana",
+          "network_registration_failed": "Verkkoon rekisteröityminen epäonnistui",
+          "incorrect_apn": "Virheellinen APN",
+          "incorrect_pdp_authentication": "PDP-tunnistautuminen epäonnistui",
+          "sim_pin": "SIM PIN vaaditaan",
+          "sim_pin2": "SIM PIN2 vaaditaan",
+          "sim_puk": "SIM PUK vaaditaan",
+          "sim_puk2": "SIM PUK2 vaaditaan",
+          "ph_sim_pin": "PH SIM PIN vaaditaan",
+          "ph_fsim_pin": "PH FSIM PIN vaaditaan",
+          "ph_fsim_puk": "PH FSIM PUK vaaditaan",
+          "ph_net_pin": "PH NET PIN vaaditaan",
+          "ph_net_puk": "PH NET PUK vaaditaan",
+          "ph_netsub_pin": "PH NETSUB PIN vaaditaan",
+          "ph_netsub_puk": "PH NETSUB PUK vaaditaan",
+          "ph_sp_pin": "PH SP PIN vaaditaan",
+          "ph_sp_puk": "PH SP PUK vaaditaan",
+          "ph_corp_pin": "PH CORP PIN vaaditaan",
+          "ph_corp_puk": "PH CORP PUK vaaditaan"
+        }
+      },
+      "device_power_mode": {
+        "name": "Laitteen virtatila",
+        "state": {
+          "on": "Päällä",
+          "sleep": "Lepotila",
+          "hibernation": "Horrostila",
+          "charging": "Lataus",
+          "shutdown": "Sammutettu"
+        }
+      },
+      "mach_software_version": {
+        "name": "MACH-ohjelmistoversio"
+      },
+      "mach_os_release": {
+        "name": "MACH-käyttöjärjestelmän julkaisu"
+      },
+      "mach_release_channel": {
+        "name": "MACH-julkaisukanava"
+      },
+      "io_firmware_version": {
+        "name": "IO-laiteohjelmistoversio"
+      },
+      "mcu_1_firmware_version": {
+        "name": "MCU 1 -laiteohjelmistoversio"
+      },
+      "mcu_2_firmware_version": {
+        "name": "MCU 2 -laiteohjelmistoversio"
+      },
+      "panel_firmware_version": {
+        "name": "Ohjauspaneelin laiteohjelmistoversio"
+      },
+      "last_successful_read": {
+        "name": "Viimeisin onnistunut luku"
       }
     },
     "binary_sensor": {
@@ -101,6 +173,12 @@
       },
       "aux_enabled": {
         "name": "AUX-tila"
+      },
+      "lte_enabled": {
+        "name": "LTE käytössä"
+      },
+      "roaming_permitted": {
+        "name": "Verkkovierailu sallittu"
       }
     },
     "light": {

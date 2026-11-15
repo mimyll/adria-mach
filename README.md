@@ -21,6 +21,8 @@ New releases appear under **Settings → Updates**. Read the release notes, inst
 
 ## Limitations
 
+- Network and installed-version diagnostics depend on the fields reported by the device. LTE enabled is a setting, not proof of internet connectivity. Firmware update availability and installation are not supported.
+
 - Requires internet access and the MACH cloud service. Cloud and vehicle delays affect readings and controls.
 - Tested on one vehicle; compatibility with other vehicles is not established. Available controls depend on the installed equipment. Configure optional equipment in the integration options.
 - **All lights off** can briefly flash the physical lights. This behavior has also been observed in the official MACH app.

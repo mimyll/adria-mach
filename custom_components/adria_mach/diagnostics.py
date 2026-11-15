@@ -1,6 +1,7 @@
 """Only normalized technical inventory, never entries, registries or raw responses."""
 
 from .client.operational import CURRENT_CONTROLS
+from .client.telemetry import DIAGNOSTIC_KEYS
 from .const import UPDATE_SECONDS
 
 
@@ -11,6 +12,11 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "capabilities": report.export() if report else None,
         "received_at": coordinator.data.received_at.isoformat(),
         "source_sample_at": None,
+        "device_diagnostics": {
+            key: coordinator.data.values[key]
+            for key in sorted(DIAGNOSTIC_KEYS)
+            if key in coordinator.data.values
+        },
         "update_seconds": UPDATE_SECONDS,
         "last_update_success": coordinator.last_update_success,
         "controls_blocked": coordinator.commands.blocked,

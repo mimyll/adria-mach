@@ -121,8 +121,17 @@ class MachClient:
             await self.live.disconnect()
 
     def _observed(self, configuration, values, device_id):
+        from .position import Levelling
+
+        if getattr(self, "_levelling_device", None) != device_id:
+            self._levelling = Levelling()
+            self._levelling_device = device_id
         measurement = self.measurement(
-            configuration, values, device_id, getattr(self, "identified_equipment", ())
+            configuration,
+            values,
+            device_id,
+            getattr(self, "identified_equipment", ()),
+            self._levelling,
         )
         if self.live is not None:
             self.live.record_values(values)
@@ -141,6 +150,7 @@ class MachClient:
             await self.reset_connection()
             self._auth_required = False
             self._devices = ()
+            self._levelling_device = None
             self._session.cookie_jar.clear()
             await self._post(
                 "/api/login/login",
@@ -174,12 +184,10 @@ class MachClient:
                 if not isinstance(configuration, dict) or configuration.get("machId") != device_id:
                     raise MachError("vehicle_identity_mismatch")
                 values = await self._device_read("getValuesAll")
-            return self.measurement(
-                configuration, values, device_id, getattr(self, "identified_equipment", ())
-            )
+            return self._observed(configuration, values, device_id)
 
     @staticmethod
-    def measurement(configuration, values, device_id, identified_equipment=()):
+    def measurement(configuration, values, device_id, identified_equipment=(), levelling=None):
         from .control_model import (
             OFF_LEVEL,
             Case,
@@ -192,9 +200,11 @@ class MachClient:
         from .master import MasterControl
         from .operational import CURRENT_CONTROLS, equipment_snapshot
         from .outside import OutsideControl
+        from .position import location_from
 
         controls = {}
-        readings = readings_from(configuration, values)
+        readings = readings_from(configuration, values, levelling)
+        location = location_from(configuration, values)
         for case in Case:
             try:
                 controls[case.value] = snapshot(
@@ -248,7 +258,15 @@ class MachClient:
             readings,
             datetime.now(UTC),
             controls,
-            inventory(configuration, values, readings, controls, identified_equipment),
+            inventory(
+                configuration,
+                values,
+                readings,
+                controls,
+                identified_equipment,
+                location_available=location is not None,
+            ),
+            location,
         )
 
     async def command(

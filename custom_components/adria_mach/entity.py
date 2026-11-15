@@ -8,7 +8,9 @@ from .const import DOMAIN
 from .coordinator import MachCoordinator
 
 
-def async_discover_diagnostics(entry, descriptions, entity_type, async_add_entities):
+def async_discover_diagnostics(
+    entry, descriptions, entity_type, async_add_entities, *, present=None
+):
     """Add optional diagnostics on the first valid shared snapshot, once per platform."""
     coordinator = entry.runtime_data
     seen = set()
@@ -20,7 +22,12 @@ def async_discover_diagnostics(entry, descriptions, entity_type, async_add_entit
         new = [
             d
             for d in descriptions
-            if d.key not in seen and coordinator.data.values.get(d.key) is not None
+            if d.key not in seen
+            and (
+                present(d)
+                if present is not None
+                else coordinator.data.values.get(d.key) is not None
+            )
         ]
         seen.update(d.key for d in new)
         if new:

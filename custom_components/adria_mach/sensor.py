@@ -15,6 +15,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 
+from .client.position import ANGLE_KEYS
 from .client.telemetry import POWER_STATES, SIM_STATES
 from .const import VALUE_ID
 from .entity import MachEntity, async_discover_diagnostics
@@ -152,6 +153,18 @@ LAST_READ = SensorEntityDescription(
     entity_category=EntityCategory.DIAGNOSTIC,
 )
 
+LEVELLING_SENSORS = tuple(
+    SensorEntityDescription(
+        key=key,
+        translation_key=key,
+        native_unit_of_measurement="°",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:angle-acute",
+    )
+    for key in ANGLE_KEYS
+)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = entry.runtime_data
@@ -169,6 +182,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         )
     )
     async_discover_diagnostics(entry, DIAGNOSTIC_SENSORS, MachDiagnosticSensor, async_add_entities)
+    async_discover_diagnostics(entry, LEVELLING_SENSORS, MachSensor, async_add_entities)
 
 
 class MachSensor(MachEntity, SensorEntity):

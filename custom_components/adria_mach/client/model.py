@@ -9,6 +9,7 @@ from typing import Any
 
 from ..const import VALUE_ID
 from .catalog import FIELDS, Field
+from .position import Levelling, Location
 from .telemetry import diagnostic_readings
 
 
@@ -32,6 +33,7 @@ class Measurement:
     received_at: datetime
     control_snapshots: Mapping[str, Any] = field(default_factory=dict, repr=False)
     capabilities: Any = field(default=None, repr=False)
+    location: Location | None = field(default=None, repr=False)
 
     def __post_init__(self):
         object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
@@ -107,7 +109,9 @@ def _reading(rows, key: str, field: Field):
     return value if value in field.options else None
 
 
-def readings_from(configuration: Any, values: Any) -> dict[str, int | float | str | bool | None]:
+def readings_from(
+    configuration: Any, values: Any, levelling=None
+) -> dict[str, int | float | str | bool | None]:
     """Project a full response onto supported known fields; never retain raw context."""
     if not isinstance(configuration, dict) or not isinstance(values, dict):
         raise MachError("invalid_measurement")
@@ -116,8 +120,12 @@ def readings_from(configuration: Any, values: Any) -> dict[str, int | float | st
         raise MachError("invalid_measurement")
     if not _supported(definitions, VALUE_ID, FIELDS[VALUE_ID]):
         raise MachError("unsupported_temperature")
-    return {
-        key: _reading(rows, key, field)
-        for key, field in FIELDS.items()
-        if _supported(definitions, key, field)
-    } | diagnostic_readings(configuration, values)
+    return (
+        {
+            key: _reading(rows, key, field)
+            for key, field in FIELDS.items()
+            if _supported(definitions, key, field)
+        }
+        | diagnostic_readings(configuration, values)
+        | (levelling or Levelling()).readings(configuration, values)
+    )

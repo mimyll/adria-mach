@@ -25,6 +25,7 @@ def backend(monkeypatch, full_snapshot):
     state.readings = full_snapshot["normalized"]
     state.control_snapshots = {}
     state.capabilities = None
+    state.location = None
 
     class Client:
         def __init__(self):
@@ -43,7 +44,11 @@ def backend(monkeypatch, full_snapshot):
                 raise state.read_error
             readings = {**state.readings, VALUE_ID: state.temperature}
             return Measurement(
-                readings, datetime.now(UTC), state.control_snapshots, state.capabilities
+                readings,
+                datetime.now(UTC),
+                state.control_snapshots,
+                state.capabilities,
+                state.location,
             )
 
         async def close(self):

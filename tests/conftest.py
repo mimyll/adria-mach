@@ -47,6 +47,24 @@ def diagnostic_snapshot(full_snapshot):
 
 
 @pytest.fixture
+def position_snapshot(diagnostic_snapshot):
+    """Synthetic offshore coordinates and independent acceleration vectors."""
+    data = deepcopy(diagnostic_snapshot)
+    for key, value in {
+        "ACCELERATION_X": 0.0,
+        "ACCELERATION_Y": 0.0,
+        "ACCELERATION_Z": 1.0,
+        "GPS_LATITUDE": 10.125,
+        "GPS_LONGITUDE": -20.25,
+    }.items():
+        data["configuration"]["values"].append(
+            {"id": key, "config": {"id": key, "type": "float", "writable": False}}
+        )
+        data["values"]["values"].append({"device": key, "status": value})
+    return data
+
+
+@pytest.fixture
 async def loopback():
     runners = []
 

@@ -70,3 +70,40 @@ def test_inventory_unsupported_schema_does_not_hide_supported_sibling(full_snaps
     assert report.definitions[0].reason == "invalid_definition"
     assert report.definitions[0].definition_type == "unknown"
     assert "arbitrary-secret-type" not in json.dumps(report.export())
+
+
+async def test_native_position_mapping_never_exports_coordinates(position_snapshot):
+    from custom_components.adria_mach.client import MachClient
+    from custom_components.adria_mach.client.position import GPS_IDS
+
+    config, values = position_snapshot["configuration"], position_snapshot["values"]
+    for row in config["values"]:
+        if row["id"] in GPS_IDS:
+            row["config"].update(range=[10.125, -20.25], label="private-coordinate-label")
+    measurement = MachClient.measurement(config, values, "synthetic-a")
+    exported = json.dumps(measurement.capabilities.export())
+    assert all(
+        private not in exported for private in ("10.125", "-20.25", "private-coordinate-label")
+    )
+    rows = {r.identifier: r for r in measurement.capabilities.definitions}
+    for key in GPS_IDS:
+        assert rows[key].native_domains == ("device_tracker",)
+        assert rows[key].disposition == "excluded"
+        assert not rows[key].read_available and not rows[key].control_available
+        assert rows[key].command_policies == ()
+        assert rows[key].verified_range is None
+    assert rows["ACCELERATION_X"].native_domains == ("sensor",)
+    assert rows["ACCELERATION_X"].read_available
+    sample = next(r for r in values["values"] if r["device"] == "ACCELERATION_X")
+    sample["status"] = None
+    missing = MachClient.measurement(config, values, "synthetic-a").capabilities
+    row = next(r for r in missing.definitions if r.identifier == "ACCELERATION_X")
+    assert row.disposition == "implemented" and not row.read_available
+    definition = next(r["config"] for r in config["values"] if r["id"] == "ACCELERATION_X")
+    definition["type"] = "string"
+    unsupported = MachClient.measurement(config, values, "synthetic-a").capabilities
+    assert all(
+        r.disposition == "unsupported" and "sensor" not in r.native_domains
+        for r in unsupported.definitions
+        if r.identifier in ("ACCELERATION_X", "ACCELERATION_Y", "ACCELERATION_Z")
+    )

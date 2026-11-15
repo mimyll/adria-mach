@@ -121,14 +121,14 @@ DIAGNOSTIC_SENSORS = (
         key="LTE_SIM_VALUE",
         translation_key="sim_status",
         device_class=SensorDeviceClass.ENUM,
-        options=list(SIM_STATES),
+        options=[state.lower() for state in SIM_STATES],
         icon="mdi:sim",
     ),
     SensorEntityDescription(
         key="SYSTEM_POWER_REGIME",
         translation_key="device_power_mode",
         device_class=SensorDeviceClass.ENUM,
-        options=list(POWER_STATES),
+        options=[state.lower() for state in POWER_STATES],
         icon="mdi:power-sleep",
     ),
     *(
@@ -179,6 +179,13 @@ class MachSensor(MachEntity, SensorEntity):
 
 class MachDiagnosticSensor(MachSensor):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self):
+        value = self.reading
+        if value is not None and self.entity_description.device_class is SensorDeviceClass.ENUM:
+            return value.lower()
+        return value
 
 
 class MachLastReadSensor(MachSensor):

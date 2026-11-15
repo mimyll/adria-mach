@@ -347,8 +347,8 @@ async def test_native_diagnostics_are_additive_and_share_reads(hass, backend, di
         "LTE_COMMUNICATION_STANDARD": ("sensor", "4G", None, None),
         "LTE_REGISTRATION_STATUS": ("sensor", "ROAMING", None, None),
         "LTE_SIGNAL_STRENGTH": ("sensor", "73", "%", None),
-        "LTE_SIM_VALUE": ("sensor", "SIM_READY", None, "enum"),
-        "SYSTEM_POWER_REGIME": ("sensor", "SLEEP", None, "enum"),
+        "LTE_SIM_VALUE": ("sensor", "sim_ready", None, "enum"),
+        "SYSTEM_POWER_REGIME": ("sensor", "sleep", None, "enum"),
         "SYSTEM_IO_FIRMWARE_VERSION": ("sensor", "03.004.005", None, None),
         "SYSTEM_FIRMWARE_VERSION_MCU_1": ("sensor", "2.3-beta", None, None),
         "mach_software_version": ("sensor", "9.8.7 2030-01-02", None, None),
@@ -366,6 +366,13 @@ async def test_native_diagnostics_are_additive_and_share_reads(hass, backend, di
             state.attributes.get("unit_of_measurement"),
             state.attributes.get("device_class"),
         ) == (value, unit, device_class)
+        if device_class == "enum":
+            assert value in state.attributes["options"]
+    translations = await async_get_translations(hass, "en", "entity", {DOMAIN})
+    assert translations["component.adria_mach.entity.sensor.sim_status.state.sim_ready"] == "Ready"
+    assert (
+        translations["component.adria_mach.entity.sensor.device_power_mode.state.sleep"] == "Sleep"
+    )
     assert registry.async_get_entity_id("sensor", DOMAIN, "synthetic-a_PANEL_VERSION") is None
     assert backend.reads == 2
     assert {

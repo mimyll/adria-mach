@@ -91,37 +91,37 @@
       "sim_status": {
         "name": "SIM status",
         "state": {
-          "SIM_READY": "Ready",
-          "SIM_NOT_INSERTED": "SIM not inserted",
-          "INCORRECT_PASSWORD": "Incorrect password",
-          "NETWORK_REGISTRATION_FAILED": "Network registration failed",
-          "INCORRECT_APN": "Incorrect APN",
-          "INCORRECT_PDP_AUTHENTICATION": "PDP authentication failed",
-          "SIM_PIN": "SIM PIN required",
-          "SIM_PIN2": "SIM PIN2 required",
-          "SIM_PUK": "SIM PUK required",
-          "SIM_PUK2": "SIM PUK2 required",
-          "PH_SIM_PIN": "PH SIM PIN required",
-          "PH_FSIM_PIN": "PH FSIM PIN required",
-          "PH_FSIM_PUK": "PH FSIM PUK required",
-          "PH_NET_PIN": "PH NET PIN required",
-          "PH_NET_PUK": "PH NET PUK required",
-          "PH_NETSUB_PIN": "PH NETSUB PIN required",
-          "PH_NETSUB_PUK": "PH NETSUB PUK required",
-          "PH_SP_PIN": "PH SP PIN required",
-          "PH_SP_PUK": "PH SP PUK required",
-          "PH_CORP_PIN": "PH CORP PIN required",
-          "PH_CORP_PUK": "PH CORP PUK required"
+          "sim_ready": "Ready",
+          "sim_not_inserted": "SIM not inserted",
+          "incorrect_password": "Incorrect password",
+          "network_registration_failed": "Network registration failed",
+          "incorrect_apn": "Incorrect APN",
+          "incorrect_pdp_authentication": "PDP authentication failed",
+          "sim_pin": "SIM PIN required",
+          "sim_pin2": "SIM PIN2 required",
+          "sim_puk": "SIM PUK required",
+          "sim_puk2": "SIM PUK2 required",
+          "ph_sim_pin": "PH SIM PIN required",
+          "ph_fsim_pin": "PH FSIM PIN required",
+          "ph_fsim_puk": "PH FSIM PUK required",
+          "ph_net_pin": "PH NET PIN required",
+          "ph_net_puk": "PH NET PUK required",
+          "ph_netsub_pin": "PH NETSUB PIN required",
+          "ph_netsub_puk": "PH NETSUB PUK required",
+          "ph_sp_pin": "PH SP PIN required",
+          "ph_sp_puk": "PH SP PUK required",
+          "ph_corp_pin": "PH CORP PIN required",
+          "ph_corp_puk": "PH CORP PUK required"
         }
       },
       "device_power_mode": {
         "name": "Device power mode",
         "state": {
-          "ON": "On",
-          "SLEEP": "Sleep",
-          "HIBERNATION": "Hibernation",
-          "CHARGING": "Charging",
-          "SHUTDOWN": "Shutdown"
+          "on": "On",
+          "sleep": "Sleep",
+          "hibernation": "Hibernation",
+          "charging": "Charging",
+          "shutdown": "Shutdown"
         }
       },
       "mach_software_version": {

@@ -91,37 +91,37 @@
       "sim_status": {
         "name": "SIM-kortin tila",
         "state": {
-          "SIM_READY": "Valmis",
-          "SIM_NOT_INSERTED": "SIM-kortti puuttuu",
-          "INCORRECT_PASSWORD": "Virheellinen salasana",
-          "NETWORK_REGISTRATION_FAILED": "Verkkoon rekisteröityminen epäonnistui",
-          "INCORRECT_APN": "Virheellinen APN",
-          "INCORRECT_PDP_AUTHENTICATION": "PDP-tunnistautuminen epäonnistui",
-          "SIM_PIN": "SIM PIN vaaditaan",
-          "SIM_PIN2": "SIM PIN2 vaaditaan",
-          "SIM_PUK": "SIM PUK vaaditaan",
-          "SIM_PUK2": "SIM PUK2 vaaditaan",
-          "PH_SIM_PIN": "PH SIM PIN vaaditaan",
-          "PH_FSIM_PIN": "PH FSIM PIN vaaditaan",
-          "PH_FSIM_PUK": "PH FSIM PUK vaaditaan",
-          "PH_NET_PIN": "PH NET PIN vaaditaan",
-          "PH_NET_PUK": "PH NET PUK vaaditaan",
-          "PH_NETSUB_PIN": "PH NETSUB PIN vaaditaan",
-          "PH_NETSUB_PUK": "PH NETSUB PUK vaaditaan",
-          "PH_SP_PIN": "PH SP PIN vaaditaan",
-          "PH_SP_PUK": "PH SP PUK vaaditaan",
-          "PH_CORP_PIN": "PH CORP PIN vaaditaan",
-          "PH_CORP_PUK": "PH CORP PUK vaaditaan"
+          "sim_ready": "Valmis",
+          "sim_not_inserted": "SIM-kortti puuttuu",
+          "incorrect_password": "Virheellinen salasana",
+          "network_registration_failed": "Verkkoon rekisteröityminen epäonnistui",
+          "incorrect_apn": "Virheellinen APN",
+          "incorrect_pdp_authentication": "PDP-tunnistautuminen epäonnistui",
+          "sim_pin": "SIM PIN vaaditaan",
+          "sim_pin2": "SIM PIN2 vaaditaan",
+          "sim_puk": "SIM PUK vaaditaan",
+          "sim_puk2": "SIM PUK2 vaaditaan",
+          "ph_sim_pin": "PH SIM PIN vaaditaan",
+          "ph_fsim_pin": "PH FSIM PIN vaaditaan",
+          "ph_fsim_puk": "PH FSIM PUK vaaditaan",
+          "ph_net_pin": "PH NET PIN vaaditaan",
+          "ph_net_puk": "PH NET PUK vaaditaan",
+          "ph_netsub_pin": "PH NETSUB PIN vaaditaan",
+          "ph_netsub_puk": "PH NETSUB PUK vaaditaan",
+          "ph_sp_pin": "PH SP PIN vaaditaan",
+          "ph_sp_puk": "PH SP PUK vaaditaan",
+          "ph_corp_pin": "PH CORP PIN vaaditaan",
+          "ph_corp_puk": "PH CORP PUK vaaditaan"
         }
       },
       "device_power_mode": {
         "name": "Laitteen virtatila",
         "state": {
-          "ON": "Päällä",
-          "SLEEP": "Lepotila",
-          "HIBERNATION": "Horrostila",
-          "CHARGING": "Lataus",
-          "SHUTDOWN": "Sammutettu"
+          "on": "Päällä",
+          "sleep": "Lepotila",
+          "hibernation": "Horrostila",
+          "charging": "Lataus",
+          "shutdown": "Sammutettu"
         }
       },
       "mach_software_version": {

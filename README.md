@@ -2,40 +2,25 @@
 
 ![Adria MACH integration](custom_components/adria_mach/brand/icon.png)
 
-Unofficial cloud integration for an Adria vehicle assigned to your MACH account. Requires Home Assistant **2026.11.0 or newer**. Equipment and available controls depend on the capabilities reported by your vehicle. Compatibility beyond the original owner's vehicle is not established.
+Unofficial integration for monitoring and controlling your Adria vehicle through the MACH cloud service. Provides measurements, lights, heating and other controls supported by your vehicle.
 
-## Install and update
+Requires **Home Assistant 2026.11.0 or newer** and a MACH account with an assigned vehicle.
 
-1. Open **Settings → Marketplace → Add from link**.
-2. Add `https://github.com/mimyll/adria-mach` as an integration and install the latest release.
-3. Restart Home Assistant, then add **Adria MACH** under **Settings → Devices & services** and sign in.
+## Installation
 
-Already using the manually installed integration? Install through Marketplace to adopt its source files, then restart. Keep your existing Adria MACH integration entry, settings, entity registry and command-history data. Do not remove or recreate the integration.
+1. Open **Settings → Marketplace → Add from link**. Connect your GitHub account if prompted.
+2. Add `https://github.com/mimyll/adria-mach` and install the latest release.
+3. Restart Home Assistant.
+4. Open **Settings → Devices & services → Add integration**, select **Adria MACH** and sign in with your MACH account.
 
-Later versions appear under **Settings → Updates**. Read the release notes, install and restart when requested. Link-added repositories require Marketplace's GitHub connection; its periodic checks can take up to 48 hours. You can refresh the repository manually. [Marketplace documentation](https://www.home-assistant.io/integrations/marketplace/).
+Already installed manually? Install through Marketplace and restart. Keep your existing integration entry; do not remove or recreate it, so your entities, settings and command history remain intact.
 
-## Features
+## Updates
 
-Temperatures, tank and battery measurements; native lights, heating thermostat, water heater, refrigerator, air conditioning and verified equipment controls. Optional equipment must be identified in integration options. Commands are serialized, expire within a bounded time and are never automatically replayed after uncertainty.
+New releases appear under **Settings → Updates**. Read the release notes, install the update and restart Home Assistant. Keep GitHub connected in Marketplace for update checks; new releases can take up to 48 hours to appear. See the [Marketplace guide](https://www.home-assistant.io/integrations/marketplace/) for details.
 
-Lights temporarily display the latest queued request; `reported_state` and `reported_brightness` retain the observed values. Cloud/vehicle delays still apply. The master lights-off operation can briefly flash the physical lights; the owner also observed this in the official MACH app.
+## Limitations
 
-English source/default labels and separate Finnish translations. Updating preserves existing entity IDs and settings. The neutral caravan icon is original artwork; this project is independent of Adria.
-
-## Development and releases
-
-Work in a clone of this repository. For the minimum supported environment:
-
-```sh
-python3.14 -m venv .venv
-. .venv/bin/activate
-python -m pip install 'pytest-homeassistant==2026.11.0' ruff==0.14.5
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin tests/test_client.py tests/test_ack_diagnostics.py tests/test_capabilities.py tests/test_release.py -q
-EXPECTED_HA_VERSION=2026.11.0 python -m pytest -c pytest-ha.ini -q
-```
-
-Push a branch and open a pull request. CI runs the synthetic/HTTP and native HA suites against both the minimum and the current stable Home Assistant. Weekly checks repeat current-stable compatibility. Failures require a reviewed code fix; passing today cannot guarantee future compatibility. Dependabot proposes GitHub Actions updates.
-
-For a release, update `manifest.json`, `pyproject.toml` and `CHANGELOG.md` to the same version, merge the tested change, then run **Actions → Release → Run workflow** on `main` with that version. The workflow retests both HA targets, builds the exact Marketplace ZIP and publishes its GitHub tag/release after all checks pass. Existing releases/assets are not overwritten. Marketplace installs the released ZIP, not unreviewed branch changes.
-
-Tests use synthetic data and local HTTP, never vehicle commands. Report issues without credentials, tokens, vehicle identifiers, locations or raw captures. MIT licensed; see [NOTICE.md](NOTICE.md).
+- Requires internet access and the MACH cloud service. Cloud and vehicle delays affect readings and controls.
+- Tested on one vehicle; compatibility with other vehicles is not established. Available controls depend on the installed equipment. Configure optional equipment in the integration options.
+- **All lights off** can briefly flash the physical lights. This behavior has also been observed in the official MACH app.

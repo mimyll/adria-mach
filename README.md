@@ -29,7 +29,7 @@ Work in a clone of this repository. For the minimum supported environment:
 ```sh
 python3.14 -m venv .venv
 . .venv/bin/activate
-python -m pip install -e '.[test]'
+python -m pip install 'pytest-homeassistant==2026.11.0' ruff==0.14.5
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -p pytest_asyncio.plugin tests/test_client.py tests/test_ack_diagnostics.py tests/test_capabilities.py tests/test_release.py -q
 EXPECTED_HA_VERSION=2026.11.0 python -m pytest -c pytest-ha.ini -q
 ```

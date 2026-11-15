@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.1
+
+- Accept chassis numbers enclosed in the manufacturer's asterisk markers, preserving the displayed text and existing privacy protections.
+
 ## 0.13.0
 
 - Add read-only vehicle model, chassis number and four reported dimensions in millimetres.

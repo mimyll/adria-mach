@@ -25,7 +25,8 @@ class VehicleInfo:
 def _text(value, *, chassis=False):
     if not isinstance(value, str):
         return None
-    pattern = r"[A-Za-z0-9][A-Za-z0-9 -]{0,63}" if chassis else r"[\w .()+/-]{1,100}"
+    chassis_text = r"[A-Za-z0-9][A-Za-z0-9 -]{0,63}"
+    pattern = rf"(?:{chassis_text}|\*{chassis_text}\*)" if chassis else r"[\w .()+/-]{1,100}"
     if not re.fullmatch(pattern, value) or not value.strip():
         return None
     return value.strip()

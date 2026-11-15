@@ -1,0 +1,57 @@
+"""Reported states only, with no actuator actions or running inference."""
+
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
+
+from .entity import MachEntity
+
+BINARY_SENSORS = (
+    BinarySensorEntityDescription(
+        key="MAINS_SUPPLY_VALUE",
+        translation_key="mains_supply",
+        device_class=BinarySensorDeviceClass.POWER,
+    ),
+    BinarySensorEntityDescription(
+        key="AIR_HEATER_VALUE", translation_key="heater_enabled", icon="mdi:radiator"
+    ),
+    BinarySensorEntityDescription(
+        key="AIR_HEATER_WORKING", translation_key="heater_operational", icon="mdi:radiator"
+    ),
+    BinarySensorEntityDescription(
+        key="WATER_HEATER_WORKING",
+        translation_key="water_heater_operational",
+        icon="mdi:water-boiler",
+    ),
+    BinarySensorEntityDescription(
+        key="LIVING_BATTERY_INSTALLED", translation_key="battery_installed", icon="mdi:car-battery"
+    ),
+    BinarySensorEntityDescription(
+        key="WATER_PUMP_VALUE", translation_key="water_pump_enabled", icon="mdi:water-pump"
+    ),
+    BinarySensorEntityDescription(
+        key="EXTERNAL_LIGHT_VALUE", translation_key="outside_light", icon="mdi:lightbulb"
+    ),
+    BinarySensorEntityDescription(
+        key="AUX_VALUE", translation_key="aux_enabled", icon="mdi:power-socket"
+    ),
+)
+
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    coordinator = entry.runtime_data
+    async_add_entities(
+        [
+            MachBinarySensor(coordinator, description)
+            for description in BINARY_SENSORS
+            if description.key in coordinator.data.values
+        ]
+    )
+
+
+class MachBinarySensor(MachEntity, BinarySensorEntity):
+    @property
+    def is_on(self) -> bool | None:
+        return self.reading

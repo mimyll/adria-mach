@@ -1,0 +1,241 @@
+{
+  "configuration": {
+    "machId": "synthetic-a",
+    "values": [
+      {
+        "id": "LIVING_MEASURED_TEMPERATURE",
+        "config": {
+          "id": "LIVING_MEASURED_TEMPERATURE",
+          "type": "integer",
+          "writable": false
+        }
+      },
+      {
+        "id": "OUTSIDE_MEASURED_TEMPERATURE",
+        "config": {
+          "id": "OUTSIDE_MEASURED_TEMPERATURE",
+          "type": "integer",
+          "writable": false
+        }
+      },
+      {
+        "id": "OUTSIDE_MEASURED_HUMIDITY",
+        "config": {
+          "id": "OUTSIDE_MEASURED_HUMIDITY",
+          "type": "integer",
+          "writable": false
+        }
+      },
+      {
+        "id": "MEASURED_PRESSURE",
+        "config": {
+          "id": "MEASURED_PRESSURE",
+          "type": "integer",
+          "writable": false
+        }
+      },
+      {
+        "id": "LIVING_BATTERY_VOLTAGE",
+        "config": {
+          "id": "LIVING_BATTERY_VOLTAGE",
+          "type": "float",
+          "writable": false
+        }
+      },
+      {
+        "id": "LIVING_BATTERY_CURRENT",
+        "config": {
+          "id": "LIVING_BATTERY_CURRENT",
+          "type": "float",
+          "writable": false
+        }
+      },
+      {
+        "id": "FRESH_WATER_LEVEL",
+        "config": {
+          "id": "FRESH_WATER_LEVEL",
+          "type": "integer",
+          "writable": false
+        }
+      },
+      {
+        "id": "WASTE_WATER_LEVEL",
+        "config": {
+          "id": "WASTE_WATER_LEVEL",
+          "type": "integer",
+          "writable": false
+        }
+      },
+      {
+        "id": "AIR_HEATER_TEMPERATURE",
+        "config": {
+          "id": "AIR_HEATER_TEMPERATURE",
+          "type": "integer"
+        }
+      },
+      {
+        "id": "WATER_HEATER_TEMPERATURE",
+        "config": {
+          "id": "WATER_HEATER_TEMPERATURE",
+          "type": "categorical"
+        }
+      },
+      {
+        "id": "MAINS_SUPPLY_VALUE",
+        "config": {
+          "id": "MAINS_SUPPLY_VALUE",
+          "type": "categorical",
+          "writable": false
+        }
+      },
+      {
+        "id": "AIR_HEATER_VALUE",
+        "config": {
+          "id": "AIR_HEATER_VALUE",
+          "type": "categorical"
+        }
+      },
+      {
+        "id": "AIR_HEATER_WORKING",
+        "config": {
+          "id": "AIR_HEATER_WORKING",
+          "type": "categorical",
+          "writable": false
+        }
+      },
+      {
+        "id": "WATER_HEATER_WORKING",
+        "config": {
+          "id": "WATER_HEATER_WORKING",
+          "type": "categorical",
+          "writable": false
+        }
+      },
+      {
+        "id": "LIVING_BATTERY_INSTALLED",
+        "config": {
+          "id": "LIVING_BATTERY_INSTALLED",
+          "type": "categorical",
+          "writable": false
+        }
+      },
+      {
+        "id": "WATER_PUMP_VALUE",
+        "config": {
+          "id": "WATER_PUMP_VALUE",
+          "type": "categorical"
+        }
+      },
+      {
+        "id": "EXTERNAL_LIGHT_VALUE",
+        "config": {
+          "id": "EXTERNAL_LIGHT_VALUE",
+          "type": "categorical"
+        }
+      },
+      {
+        "id": "AUX_VALUE",
+        "config": {
+          "id": "AUX_VALUE",
+          "type": "categorical"
+        }
+      }
+    ]
+  },
+  "values": {
+    "values": [
+      {
+        "device": "LIVING_MEASURED_TEMPERATURE",
+        "status": 0
+      },
+      {
+        "device": "OUTSIDE_MEASURED_TEMPERATURE",
+        "status": -3
+      },
+      {
+        "device": "OUTSIDE_MEASURED_HUMIDITY",
+        "status": 81
+      },
+      {
+        "device": "MEASURED_PRESSURE",
+        "status": 997
+      },
+      {
+        "device": "LIVING_BATTERY_VOLTAGE",
+        "status": 12.7
+      },
+      {
+        "device": "LIVING_BATTERY_CURRENT",
+        "status": -0.35
+      },
+      {
+        "device": "FRESH_WATER_LEVEL",
+        "status": 0
+      },
+      {
+        "device": "WASTE_WATER_LEVEL",
+        "status": 42
+      },
+      {
+        "device": "AIR_HEATER_TEMPERATURE",
+        "status": 19
+      },
+      {
+        "device": "WATER_HEATER_TEMPERATURE",
+        "status": "normal"
+      },
+      {
+        "device": "MAINS_SUPPLY_VALUE",
+        "status": "on"
+      },
+      {
+        "device": "AIR_HEATER_VALUE",
+        "status": "off"
+      },
+      {
+        "device": "AIR_HEATER_WORKING",
+        "status": "on"
+      },
+      {
+        "device": "WATER_HEATER_WORKING",
+        "status": "off"
+      },
+      {
+        "device": "LIVING_BATTERY_INSTALLED",
+        "status": "on"
+      },
+      {
+        "device": "WATER_PUMP_VALUE",
+        "status": "off"
+      },
+      {
+        "device": "EXTERNAL_LIGHT_VALUE",
+        "status": "on"
+      },
+      {
+        "device": "AUX_VALUE",
+        "status": "off"
+      }
+    ]
+  },
+  "normalized": {
+    "LIVING_MEASURED_TEMPERATURE": 0,
+    "OUTSIDE_MEASURED_TEMPERATURE": -3,
+    "OUTSIDE_MEASURED_HUMIDITY": 81,
+    "MEASURED_PRESSURE": 997,
+    "LIVING_BATTERY_VOLTAGE": 12.7,
+    "LIVING_BATTERY_CURRENT": -0.35,
+    "FRESH_WATER_LEVEL": 0,
+    "WASTE_WATER_LEVEL": 42,
+    "AIR_HEATER_TEMPERATURE": 19,
+    "WATER_HEATER_TEMPERATURE": "normal",
+    "MAINS_SUPPLY_VALUE": true,
+    "AIR_HEATER_VALUE": false,
+    "AIR_HEATER_WORKING": true,
+    "WATER_HEATER_WORKING": false,
+    "LIVING_BATTERY_INSTALLED": true,
+    "WATER_PUMP_VALUE": false,
+    "EXTERNAL_LIGHT_VALUE": true,
+    "AUX_VALUE": false
+  }
+}

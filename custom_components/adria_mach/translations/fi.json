@@ -1,0 +1,469 @@
+{
+  "title": "Adria MACH",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kirjaudu Adria MACHiin",
+        "description": "Lue mittaukset ja säädä varmennettuja valoja, lämmitystä ja laitteita. Home Assistant tallentaa tunnukset. Valvo fyysiset kokeet paikallisesti.",
+        "data": {
+          "username": "Käyttäjätunnus",
+          "password": "Salasana"
+        }
+      },
+      "vehicle": {
+        "title": "Valitse ajoneuvo",
+        "data": {
+          "mach_id": "Tilille liitetty ajoneuvo"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Kirjaudu uudelleen",
+        "description": "Käytä tiliä, johon sama ajoneuvo on liitetty.",
+        "data": {
+          "username": "Käyttäjätunnus",
+          "password": "Salasana"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Kirjautumistiedot hylättiin.",
+      "cannot_connect": "MACH-yhteys ei onnistunut. Yritä myöhemmin uudelleen.",
+      "device_not_assigned": "Tälle tilille ei ole liitetty määritettyä ajoneuvoa.",
+      "no_supported_devices": "Tililtä ei löytynyt tuettua MACH PLUS -ajoneuvoa."
+    },
+    "abort": {
+      "already_configured": "Tämä ajoneuvo on jo määritetty.",
+      "device_not_assigned": "Valittua ajoneuvoa ei ole liitetty tälle tilille."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "living_temperature": {
+        "name": "Sisälämpötila"
+      },
+      "outside_temperature": {
+        "name": "Ulkolämpötila"
+      },
+      "outside_humidity": {
+        "name": "Ulkoilman kosteus"
+      },
+      "pressure": {
+        "name": "Ilmanpaine"
+      },
+      "battery_voltage": {
+        "name": "Asunto-osan akun jännite"
+      },
+      "battery_current": {
+        "name": "Asunto-osan akun virta"
+      },
+      "fresh_water_level": {
+        "name": "Raikasvesisäiliön täyttöaste"
+      },
+      "waste_water_level": {
+        "name": "Harmaavesisäiliön täyttöaste"
+      },
+      "heater_target": {
+        "name": "Lämmityksen asetuslämpötila"
+      },
+      "water_heater_mode": {
+        "name": "Vedenlämmittimen tila",
+        "state": {
+          "off": "Pois",
+          "normal": "Normaali",
+          "boost": "Tehostus"
+        }
+      },
+      "capability_inventory": {
+        "name": "Kyvykkyysluettelo"
+      }
+    },
+    "binary_sensor": {
+      "mains_supply": {
+        "name": "Verkkovirta"
+      },
+      "heater_enabled": {
+        "name": "Lämmitys käytössä"
+      },
+      "heater_operational": {
+        "name": "Lämmittimen toimintavalmius"
+      },
+      "water_heater_operational": {
+        "name": "Vedenlämmittimen toimintavalmius"
+      },
+      "battery_installed": {
+        "name": "Asunto-osan akku asennettu"
+      },
+      "water_pump_enabled": {
+        "name": "Vesipumppu käytössä"
+      },
+      "outside_light": {
+        "name": "Ulkovalon tila"
+      },
+      "aux_enabled": {
+        "name": "AUX-tila"
+      }
+    },
+    "light": {
+      "outside_light": {
+        "name": "Ulkovalo"
+      },
+      "light_group_1": {
+        "name": "Valoryhmä 1"
+      },
+      "light_group_2": {
+        "name": "Valoryhmä 2"
+      },
+      "light_group_3": {
+        "name": "Valoryhmä 3"
+      },
+      "light_group_4": {
+        "name": "Valoryhmä 4"
+      },
+      "light_group_5": {
+        "name": "Valoryhmä 5"
+      },
+      "light_group_6": {
+        "name": "Valoryhmä 6"
+      },
+      "light_group_7": {
+        "name": "Valoryhmä 7"
+      },
+      "light_group_8": {
+        "name": "Valoryhmä 8"
+      },
+      "light_master": {
+        "name": "Valojen pääkytkin"
+      }
+    },
+    "number": {
+      "heater_target_control": {
+        "name": "Lämmityksen asetuslämpötilan ohjaus"
+      },
+      "ac_target": {
+        "name": "Ilmastoinnin asetuslämpötila"
+      }
+    },
+    "water_heater": {
+      "water_heater_control": {
+        "name": "Vedenlämmityksen ohjaus",
+        "state": {
+          "off": "Pois",
+          "normal": "Normaali",
+          "boost": "Tehostus"
+        }
+      }
+    },
+    "climate": {
+      "heating_climate": {
+        "name": "Lämmitys"
+      }
+    },
+    "select": {
+      "heating_source": {
+        "name": "Lämmityksen energialähde",
+        "state": {
+          "off": "Pois",
+          "on": "Päällä",
+          "gas": "Kaasu",
+          "electricity": "Sähkö",
+          "auto": "Automaattinen",
+          "ac": "Verkkovirta",
+          "dc": "Akkuvirta",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Sähkö 1",
+          "el2": "Sähkö 2",
+          "el3": "Sähkö 3",
+          "el1_and_gas": "Sähkö 1 ja kaasu",
+          "el2_and_gas": "Sähkö 2 ja kaasu",
+          "el3_and_gas": "Sähkö 3 ja kaasu",
+          "cool": "Jäähdytys",
+          "heat": "Lämmitys",
+          "fan": "Puhallus",
+          "dry": "Kuivaus",
+          "dehumidify": "Kosteudenpoisto",
+          "low": "Pieni",
+          "medium": "Keskitaso",
+          "high": "Suuri"
+        }
+      },
+      "heating_priority": {
+        "name": "Lämmityksen energiaprioriteetti",
+        "state": {
+          "off": "Pois",
+          "on": "Päällä",
+          "gas": "Kaasu",
+          "electricity": "Sähkö",
+          "auto": "Automaattinen",
+          "ac": "Verkkovirta",
+          "dc": "Akkuvirta",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Sähkö 1",
+          "el2": "Sähkö 2",
+          "el3": "Sähkö 3",
+          "el1_and_gas": "Sähkö 1 ja kaasu",
+          "el2_and_gas": "Sähkö 2 ja kaasu",
+          "el3_and_gas": "Sähkö 3 ja kaasu",
+          "cool": "Jäähdytys",
+          "heat": "Lämmitys",
+          "fan": "Puhallus",
+          "dry": "Kuivaus",
+          "dehumidify": "Kosteudenpoisto",
+          "low": "Pieni",
+          "medium": "Keskitaso",
+          "high": "Suuri"
+        }
+      },
+      "fridge_source": {
+        "name": "Jääkaapin energialähde",
+        "state": {
+          "off": "Pois",
+          "on": "Päällä",
+          "gas": "Kaasu",
+          "electricity": "Sähkö",
+          "auto": "Automaattinen",
+          "ac": "Verkkovirta",
+          "dc": "Akkuvirta",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Sähkö 1",
+          "el2": "Sähkö 2",
+          "el3": "Sähkö 3",
+          "el1_and_gas": "Sähkö 1 ja kaasu",
+          "el2_and_gas": "Sähkö 2 ja kaasu",
+          "el3_and_gas": "Sähkö 3 ja kaasu",
+          "cool": "Jäähdytys",
+          "heat": "Lämmitys",
+          "fan": "Puhallus",
+          "dry": "Kuivaus",
+          "dehumidify": "Kosteudenpoisto",
+          "low": "Pieni",
+          "medium": "Keskitaso",
+          "high": "Suuri"
+        }
+      },
+      "fridge_level": {
+        "name": "Jääkaapin jäähdytystaso",
+        "state": {
+          "off": "Pois",
+          "on": "Päällä",
+          "gas": "Kaasu",
+          "electricity": "Sähkö",
+          "auto": "Automaattinen",
+          "ac": "Verkkovirta",
+          "dc": "Akkuvirta",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Sähkö 1",
+          "el2": "Sähkö 2",
+          "el3": "Sähkö 3",
+          "el1_and_gas": "Sähkö 1 ja kaasu",
+          "el2_and_gas": "Sähkö 2 ja kaasu",
+          "el3_and_gas": "Sähkö 3 ja kaasu",
+          "cool": "Jäähdytys",
+          "heat": "Lämmitys",
+          "fan": "Puhallus",
+          "dry": "Kuivaus",
+          "dehumidify": "Kosteudenpoisto",
+          "low": "Pieni",
+          "medium": "Keskitaso",
+          "high": "Suuri"
+        }
+      },
+      "ac_mode": {
+        "name": "Ilmastoinnin toimintatila",
+        "state": {
+          "off": "Pois",
+          "on": "Päällä",
+          "gas": "Kaasu",
+          "electricity": "Sähkö",
+          "auto": "Automaattinen",
+          "ac": "Verkkovirta",
+          "dc": "Akkuvirta",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Sähkö 1",
+          "el2": "Sähkö 2",
+          "el3": "Sähkö 3",
+          "el1_and_gas": "Sähkö 1 ja kaasu",
+          "el2_and_gas": "Sähkö 2 ja kaasu",
+          "el3_and_gas": "Sähkö 3 ja kaasu",
+          "cool": "Jäähdytys",
+          "heat": "Lämmitys",
+          "fan": "Puhallus",
+          "dry": "Kuivaus",
+          "dehumidify": "Kosteudenpoisto",
+          "low": "Pieni",
+          "medium": "Keskitaso",
+          "high": "Suuri"
+        }
+      },
+      "ac_fan": {
+        "name": "Ilmastoinnin puhallin",
+        "state": {
+          "off": "Pois",
+          "on": "Päällä",
+          "gas": "Kaasu",
+          "electricity": "Sähkö",
+          "auto": "Automaattinen",
+          "ac": "Verkkovirta",
+          "dc": "Akkuvirta",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Sähkö 1",
+          "el2": "Sähkö 2",
+          "el3": "Sähkö 3",
+          "el1_and_gas": "Sähkö 1 ja kaasu",
+          "el2_and_gas": "Sähkö 2 ja kaasu",
+          "el3_and_gas": "Sähkö 3 ja kaasu",
+          "cool": "Jäähdytys",
+          "heat": "Lämmitys",
+          "fan": "Puhallus",
+          "dry": "Kuivaus",
+          "dehumidify": "Kosteudenpoisto",
+          "low": "Pieni",
+          "medium": "Keskitaso",
+          "high": "Suuri",
+          "mid": "Keskitaso"
+        }
+      }
+    },
+    "switch": {
+      "fridge_power": {
+        "name": "Jääkaapin virta"
+      },
+      "fridge_auto": {
+        "name": "Jääkaapin automaattitila"
+      },
+      "fridge_frame": {
+        "name": "Jääkaapin kehyslämmitys"
+      },
+      "water_pump": {
+        "name": "Vesipumppu"
+      },
+      "aux_output": {
+        "name": "Tunnistettu AUX-lähtö"
+      },
+      "alde_panel": {
+        "name": "Alde-paneelin ohjaus"
+      },
+      "ac_power": {
+        "name": "Ilmastoinnin virta"
+      }
+    },
+    "button": {
+      "light_memory_save": {
+        "name": "Tallenna valomuisti {number}"
+      },
+      "all_lights_off": {
+        "name": "Sammuta kaikki valot"
+      }
+    },
+    "scene": {
+      "light_memory_restore": {
+        "name": "Palauta valomuisti {number}"
+      }
+    }
+  },
+  "exceptions": {
+    "controls_blocked": {
+      "message": "Ohjaus tarvitsee tuoreen tilahaun tai tiedostovirheen selvityksen. Uusi käsikäyttöinen pyyntö hakee tilan ennen ohjausta; vanhaa komentoa ei toisteta."
+    },
+    "control_busy": {
+      "message": "Edellinen ohjaus on kesken."
+    },
+    "invalid_control_value": {
+      "message": "Arvo ei ole sallittu tälle valolle, lämpötila- tai vedenlämmityssäätimelle."
+    },
+    "test_case_complete": {
+      "message": "Tämän kohteen rajattu testikierros on valmis. Uutta kierrosta ei ole avattu."
+    },
+    "control_preflight_failed": {
+      "message": "Ohjausta ei lähetetty: lähtötila, määritys tai yhteys ei täyttänyt ehtoja."
+    },
+    "legacy_restore_required": {
+      "message": "Aiempi rajattu valokoe odottaa vielä sammutusta. Viimeistele se ennen muiden ohjausten käyttöä."
+    },
+    "probe_busy": {
+      "message": "Lukukoe tai ohjaus on kesken. Odota sen valmistumista."
+    },
+    "probe_failed": {
+      "message": "Lukukoe ei valmistunut. Katso integraation diagnostiikka; ohjausten lukitus säilyy."
+    },
+    "light_queue_failed": {
+      "message": "Pyynnön aikaraja ylittyi, jono on täynnä tai integraatio pysäytettiin. Tarkista nykyinen tila ennen uutta pyyntöä."
+    },
+    "equipment_not_enabled": {
+      "message": "Lisävarustetta ei ole tunnistettu integraation asetuksissa."
+    }
+  },
+  "services": {
+    "probe_connection": {
+      "name": "Testaa yhteyden lukeminen",
+      "description": "Vain ylläpitäjälle: avaa tilayhteys kahdesti ja hae tuore tila, yhteensä enintään 60 sekuntia. Ei laitekomentoja eikä lukituksen purkua.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integraatio",
+          "description": "Testattava Adria MACH -integraatio."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Valojen yhteensopivuus",
+        "description": "Valitse tunnistetut lisävarusteet vain, kun tiedät niiden olevan asennettu. AUX-valinta edellyttää kytketyn kuorman tunnistamista. Asetukset eivät lähetä laitekomentoja.",
+        "data": {
+          "onoff_lights": "Vain päälle/pois toimivat valot",
+          "identified_equipment": "Tunnistetut lisävarusteet"
+        }
+      }
+    },
+    "error": {
+      "invalid_light_selection": "Valitse vain luettelossa olevia valoja.",
+      "invalid_equipment_selection": "Valitse vain lueteltuja lisävarusteita."
+    }
+  },
+  "selector": {
+    "onoff_lights": {
+      "options": {
+        "light-group-1": "Valoryhmä 1",
+        "light-group-2": "Valoryhmä 2",
+        "light-group-3": "Valoryhmä 3",
+        "light-group-4": "Valoryhmä 4",
+        "light-group-5": "Valoryhmä 5",
+        "light-group-6": "Valoryhmä 6",
+        "light-group-7": "Valoryhmä 7",
+        "light-group-8": "Valoryhmä 8",
+        "outside-light": "Ulkovalo"
+      }
+    },
+    "identified_equipment": {
+      "options": {
+        "aux": "Tunnistettu AUX-kuorma",
+        "alde": "Alde-lämmitys",
+        "air_conditioning": "Asennettu ilmastointilaite"
+      }
+    }
+  }
+}

@@ -1,0 +1,469 @@
+{
+  "title": "Adria MACH",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in to Adria MACH",
+        "description": "Read measurements and manually adjust verified lights, heating and equipment. Home Assistant stores the credentials. Supervise physical tests locally.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "vehicle": {
+        "title": "Choose your vehicle",
+        "data": {
+          "mach_id": "Assigned vehicle"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "Use an account assigned to the same vehicle.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The credentials were rejected.",
+      "cannot_connect": "Could not connect to MACH. Try again later.",
+      "device_not_assigned": "This account is not assigned to the configured vehicle.",
+      "no_supported_devices": "No supported MACH PLUS vehicle was found on this account."
+    },
+    "abort": {
+      "already_configured": "This vehicle is already configured.",
+      "device_not_assigned": "The selected vehicle is not assigned to this account."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "living_temperature": {
+        "name": "Living temperature"
+      },
+      "outside_temperature": {
+        "name": "Outside temperature"
+      },
+      "outside_humidity": {
+        "name": "Outside humidity"
+      },
+      "pressure": {
+        "name": "Atmospheric pressure"
+      },
+      "battery_voltage": {
+        "name": "Living battery voltage"
+      },
+      "battery_current": {
+        "name": "Living battery current"
+      },
+      "fresh_water_level": {
+        "name": "Fresh water level"
+      },
+      "waste_water_level": {
+        "name": "Waste water level"
+      },
+      "heater_target": {
+        "name": "Heater target temperature"
+      },
+      "water_heater_mode": {
+        "name": "Water heater mode",
+        "state": {
+          "off": "Off",
+          "normal": "Normal",
+          "boost": "Boost"
+        }
+      },
+      "capability_inventory": {
+        "name": "Capability inventory"
+      }
+    },
+    "binary_sensor": {
+      "mains_supply": {
+        "name": "Mains supply"
+      },
+      "heater_enabled": {
+        "name": "Heating enabled"
+      },
+      "heater_operational": {
+        "name": "Heater operational"
+      },
+      "water_heater_operational": {
+        "name": "Water heater operational"
+      },
+      "battery_installed": {
+        "name": "Living battery installed"
+      },
+      "water_pump_enabled": {
+        "name": "Water pump enabled"
+      },
+      "outside_light": {
+        "name": "Outside light state"
+      },
+      "aux_enabled": {
+        "name": "AUX state"
+      }
+    },
+    "light": {
+      "outside_light": {
+        "name": "Outside light"
+      },
+      "light_group_1": {
+        "name": "Light group 1"
+      },
+      "light_group_2": {
+        "name": "Light group 2"
+      },
+      "light_group_3": {
+        "name": "Light group 3"
+      },
+      "light_group_4": {
+        "name": "Light group 4"
+      },
+      "light_group_5": {
+        "name": "Light group 5"
+      },
+      "light_group_6": {
+        "name": "Light group 6"
+      },
+      "light_group_7": {
+        "name": "Light group 7"
+      },
+      "light_group_8": {
+        "name": "Light group 8"
+      },
+      "light_master": {
+        "name": "Lights master"
+      }
+    },
+    "number": {
+      "heater_target_control": {
+        "name": "Heater target control"
+      },
+      "ac_target": {
+        "name": "Air conditioner target"
+      }
+    },
+    "water_heater": {
+      "water_heater_control": {
+        "name": "Water heating control",
+        "state": {
+          "off": "Off",
+          "normal": "Normal",
+          "boost": "Boost"
+        }
+      }
+    },
+    "climate": {
+      "heating_climate": {
+        "name": "Heating"
+      }
+    },
+    "select": {
+      "heating_source": {
+        "name": "Heating energy source",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "gas": "Gas",
+          "electricity": "Electricity",
+          "auto": "Automatic",
+          "ac": "AC mains",
+          "dc": "DC battery",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Electric 1",
+          "el2": "Electric 2",
+          "el3": "Electric 3",
+          "el1_and_gas": "Electric 1 and gas",
+          "el2_and_gas": "Electric 2 and gas",
+          "el3_and_gas": "Electric 3 and gas",
+          "cool": "Cooling",
+          "heat": "Heating",
+          "fan": "Fan",
+          "dry": "Dry",
+          "dehumidify": "Dehumidify",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "heating_priority": {
+        "name": "Heating energy priority",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "gas": "Gas",
+          "electricity": "Electricity",
+          "auto": "Automatic",
+          "ac": "AC mains",
+          "dc": "DC battery",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Electric 1",
+          "el2": "Electric 2",
+          "el3": "Electric 3",
+          "el1_and_gas": "Electric 1 and gas",
+          "el2_and_gas": "Electric 2 and gas",
+          "el3_and_gas": "Electric 3 and gas",
+          "cool": "Cooling",
+          "heat": "Heating",
+          "fan": "Fan",
+          "dry": "Dry",
+          "dehumidify": "Dehumidify",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "fridge_source": {
+        "name": "Refrigerator energy source",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "gas": "Gas",
+          "electricity": "Electricity",
+          "auto": "Automatic",
+          "ac": "AC mains",
+          "dc": "DC battery",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Electric 1",
+          "el2": "Electric 2",
+          "el3": "Electric 3",
+          "el1_and_gas": "Electric 1 and gas",
+          "el2_and_gas": "Electric 2 and gas",
+          "el3_and_gas": "Electric 3 and gas",
+          "cool": "Cooling",
+          "heat": "Heating",
+          "fan": "Fan",
+          "dry": "Dry",
+          "dehumidify": "Dehumidify",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "fridge_level": {
+        "name": "Refrigerator cooling level",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "gas": "Gas",
+          "electricity": "Electricity",
+          "auto": "Automatic",
+          "ac": "AC mains",
+          "dc": "DC battery",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Electric 1",
+          "el2": "Electric 2",
+          "el3": "Electric 3",
+          "el1_and_gas": "Electric 1 and gas",
+          "el2_and_gas": "Electric 2 and gas",
+          "el3_and_gas": "Electric 3 and gas",
+          "cool": "Cooling",
+          "heat": "Heating",
+          "fan": "Fan",
+          "dry": "Dry",
+          "dehumidify": "Dehumidify",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "ac_mode": {
+        "name": "Air conditioner mode",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "gas": "Gas",
+          "electricity": "Electricity",
+          "auto": "Automatic",
+          "ac": "AC mains",
+          "dc": "DC battery",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Electric 1",
+          "el2": "Electric 2",
+          "el3": "Electric 3",
+          "el1_and_gas": "Electric 1 and gas",
+          "el2_and_gas": "Electric 2 and gas",
+          "el3_and_gas": "Electric 3 and gas",
+          "cool": "Cooling",
+          "heat": "Heating",
+          "fan": "Fan",
+          "dry": "Dry",
+          "dehumidify": "Dehumidify",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "ac_fan": {
+        "name": "Air conditioner fan",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "gas": "Gas",
+          "electricity": "Electricity",
+          "auto": "Automatic",
+          "ac": "AC mains",
+          "dc": "DC battery",
+          "one": "1",
+          "two": "2",
+          "three": "3",
+          "four": "4",
+          "five": "5",
+          "el1": "Electric 1",
+          "el2": "Electric 2",
+          "el3": "Electric 3",
+          "el1_and_gas": "Electric 1 and gas",
+          "el2_and_gas": "Electric 2 and gas",
+          "el3_and_gas": "Electric 3 and gas",
+          "cool": "Cooling",
+          "heat": "Heating",
+          "fan": "Fan",
+          "dry": "Dry",
+          "dehumidify": "Dehumidify",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "mid": "Medium"
+        }
+      }
+    },
+    "switch": {
+      "fridge_power": {
+        "name": "Refrigerator power"
+      },
+      "fridge_auto": {
+        "name": "Refrigerator automatic mode"
+      },
+      "fridge_frame": {
+        "name": "Refrigerator frame heater"
+      },
+      "water_pump": {
+        "name": "Water pump"
+      },
+      "aux_output": {
+        "name": "Identified AUX output"
+      },
+      "alde_panel": {
+        "name": "Alde panel control"
+      },
+      "ac_power": {
+        "name": "Air conditioner power"
+      }
+    },
+    "button": {
+      "light_memory_save": {
+        "name": "Save light memory {number}"
+      },
+      "all_lights_off": {
+        "name": "All lights off"
+      }
+    },
+    "scene": {
+      "light_memory_restore": {
+        "name": "Recall light memory {number}"
+      }
+    }
+  },
+  "exceptions": {
+    "controls_blocked": {
+      "message": "A fresh state check or storage repair is required. A new manual request resynchronizes before dispatch; old commands are never replayed."
+    },
+    "control_busy": {
+      "message": "A command is already in progress."
+    },
+    "invalid_control_value": {
+      "message": "This value is not supported by the light, temperature or water-heating control."
+    },
+    "test_case_complete": {
+      "message": "This bounded test case is complete. Another batch is not enabled."
+    },
+    "control_preflight_failed": {
+      "message": "No command sent: baseline, definition or connection did not satisfy preflight."
+    },
+    "legacy_restore_required": {
+      "message": "A previous bounded test awaits its original OFF restoration. Complete that test before another control."
+    },
+    "probe_busy": {
+      "message": "A read probe or command is active. Wait for it to finish."
+    },
+    "probe_failed": {
+      "message": "The read probe did not complete. Inspect integration diagnostics; the control interlock is unchanged."
+    },
+    "light_queue_failed": {
+      "message": "The request expired, the queue is full or the integration was stopped. Inspect current state before a new request."
+    },
+    "equipment_not_enabled": {
+      "message": "The optional equipment has not been identified in integration options."
+    }
+  },
+  "services": {
+    "probe_connection": {
+      "name": "Probe connection reads",
+      "description": "Admin-only: open readiness twice and read fresh state within 60 seconds. No actuator command or interlock release.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration",
+          "description": "The loaded Adria MACH integration to inspect."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Light compatibility",
+        "description": "Enable optional equipment only after identifying its installed hardware. AUX requires identifying its connected load. Options never send device commands.",
+        "data": {
+          "onoff_lights": "ON/OFF-only lights",
+          "identified_equipment": "Identified optional equipment"
+        }
+      }
+    },
+    "error": {
+      "invalid_light_selection": "Select only lights from the list.",
+      "invalid_equipment_selection": "Select only listed optional equipment."
+    }
+  },
+  "selector": {
+    "onoff_lights": {
+      "options": {
+        "light-group-1": "Light group 1",
+        "light-group-2": "Light group 2",
+        "light-group-3": "Light group 3",
+        "light-group-4": "Light group 4",
+        "light-group-5": "Light group 5",
+        "light-group-6": "Light group 6",
+        "light-group-7": "Light group 7",
+        "light-group-8": "Light group 8",
+        "outside-light": "Outside light"
+      }
+    },
+    "identified_equipment": {
+      "options": {
+        "aux": "Identified AUX load",
+        "alde": "Alde heating",
+        "air_conditioning": "Installed air conditioner"
+      }
+    }
+  }
+}

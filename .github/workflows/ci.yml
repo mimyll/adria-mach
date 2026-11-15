@@ -1,0 +1,85 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+  schedule:
+    - cron: '25 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  environments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - id: resolve
+        run: |
+          matrix="$(python3 scripts/ci_matrix.py)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "$matrix" >> "$GITHUB_STEP_SUMMARY"
+
+  tests:
+    needs: environments
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.environments.outputs.matrix) }}
+    name: HA ${{ matrix.ha }} / Python ${{ matrix.python }} (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install exact HA and matching native fixtures
+        env:
+          HA_VERSION: ${{ matrix.ha }}
+        run: |
+          python -m pip install "homeassistant==$HA_VERSION" "pytest-homeassistant==$HA_VERSION" ruff==0.14.5
+          python -m pip install -e . --no-deps
+      - name: Packaging and CI resolver checks
+        run: |
+          python -m ruff check scripts/package_release.py scripts/ci_matrix.py tests/test_release.py
+          python -m ruff format --check scripts/package_release.py scripts/ci_matrix.py tests/test_release.py
+      - name: Synthetic protocol, real HTTP loopback and release artifacts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: python -m pytest -p pytest_asyncio.plugin tests/test_client.py tests/test_ack_diagnostics.py tests/test_capabilities.py tests/test_release.py -q
+      - name: Native HA lifecycle, identities and controls (synthetic backend)
+        env:
+          EXPECTED_HA_VERSION: ${{ matrix.ha }}
+        run: python -m pytest -c pytest-ha.ini -q
+      - name: Build Marketplace asset from this exact checkout
+        run: |
+          version="$(python -c 'import json; print(json.load(open("custom_components/adria_mach/manifest.json"))["version"])')"
+          python scripts/package_release.py --version "$version"
+
+  hassfest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361
+
+  hacs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
+        with:
+          category: integration
+          comment: false

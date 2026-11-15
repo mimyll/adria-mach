@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable version already recorded in manifest, pyproject and changelog (for example 0.10.2)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the intended personal repository and main branch
+        run: |
+          test "$GITHUB_REPOSITORY" = 'mimyll/adria-mach'
+          test "$GITHUB_REF" = 'refs/heads/main'
+  checks:
+    needs: guard
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+  publish:
+    needs: [guard, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: '3.14.10'
+      - name: Build exact version and notes before any release mutation
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python scripts/package_release.py --version "$RELEASE_VERSION"
+      - name: Create draft, verify uploaded bytes, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .visibility)" = public
+          tag="v$RELEASE_VERSION"
+          python - <<'PY'
+          import os
+          import urllib.error
+          import urllib.request
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          tag = "v" + os.environ["RELEASE_VERSION"]
+          for resource in ("releases/tags/" + tag, "git/ref/tags/" + tag):
+              request = urllib.request.Request(
+                  "https://api.github.com/repos/" + repository + "/" + resource,
+                  headers={
+                      "Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                      "Accept": "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=30):
+                      raise SystemExit("Release or tag already exists; refusing overwrite.")
+              except urllib.error.HTTPError as error:
+                  if error.code != 404:
+                      raise SystemExit("Cannot verify release/tag absence; publication stopped.")
+              except (urllib.error.URLError, TimeoutError):
+                  raise SystemExit("Cannot verify release/tag absence; publication stopped.")
+          PY
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$tag" --draft --notes-file "dist/$tag/release-notes.md"
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "dist/$tag/adria_mach.zip" "dist/$tag/adria_mach.zip.sha256" "dist/$tag/release.json"
+          mkdir "$RUNNER_TEMP/adria-release-check"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/adria-release-check"
+          cmp "dist/$tag/adria_mach.zip" "$RUNNER_TEMP/adria-release-check/adria_mach.zip"
+          cmp "dist/$tag/adria_mach.zip.sha256" "$RUNNER_TEMP/adria-release-check/adria_mach.zip.sha256"
+          cmp "dist/$tag/release.json" "$RUNNER_TEMP/adria-release-check/release.json"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest

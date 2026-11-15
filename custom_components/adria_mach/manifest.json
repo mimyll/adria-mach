@@ -1,7 +1,9 @@
 {
   "domain": "adria_mach",
   "name": "Adria MACH",
-  "codeowners": ["@mimyll"],
+  "codeowners": [
+    "@mimyll"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/mimyll/adria-mach",
@@ -9,5 +11,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/mimyll/adria-mach/issues",
   "requirements": [],
-  "version": "0.11.0"
+  "version": "0.12.0"
 }

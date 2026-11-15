@@ -147,6 +147,12 @@
       },
       "last_successful_read": {
         "name": "Last successful read"
+      },
+      "levelling_pitch": {
+        "name": "Longitudinal tilt"
+      },
+      "levelling_roll": {
+        "name": "Lateral tilt"
       }
     },
     "binary_sensor": {
@@ -459,6 +465,11 @@
     "scene": {
       "light_memory_restore": {
         "name": "Recall light memory {number}"
+      }
+    },
+    "device_tracker": {
+      "location": {
+        "name": "Location"
       }
     }
   },

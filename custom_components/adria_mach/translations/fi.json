@@ -147,6 +147,12 @@
       },
       "last_successful_read": {
         "name": "Viimeisin onnistunut luku"
+      },
+      "levelling_pitch": {
+        "name": "Pitkittäiskallistuma"
+      },
+      "levelling_roll": {
+        "name": "Sivuttaiskallistuma"
       }
     },
     "binary_sensor": {
@@ -459,6 +465,11 @@
     "scene": {
       "light_memory_restore": {
         "name": "Palauta valomuisti {number}"
+      }
+    },
+    "device_tracker": {
+      "location": {
+        "name": "Sijainti"
       }
     }
   },

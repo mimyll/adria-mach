@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0
+
+- Add longitudinal and lateral levelling angles using reported mounting and calibration data.
+- Add an optional native GPS location entity, disabled by default. Enable it in the entity settings to show the vehicle on the map; Home Assistant may record location history.
+- Reuse shared reads and keep coordinates out of diagnostic exports. Existing entities, settings and command history remain unchanged.
+
 ## 0.11.0
 
 - Add read-only mobile network, signal quality, SIM status and device power diagnostics where reported.

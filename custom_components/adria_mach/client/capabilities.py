@@ -8,6 +8,7 @@ from .control_model import Case, HeatingControl, ManualControl, WaterControl
 from .master import MasterControl
 from .operational import CURRENT_CONTROLS, EquipmentControl
 from .outside import OutsideControl
+from .position import ANGLE_KEYS, AXES, GPS_IDS, levelling_supported
 from .telemetry import DIAGNOSTIC_FIELDS
 
 # Reviewed public technical symbols, not a lexical test of untrusted identifiers.
@@ -221,13 +222,16 @@ class Inventory:
         }
 
 
-def inventory(configuration, values, readings, controls, identified_equipment=()):
+def inventory(
+    configuration, values, readings, controls, identified_equipment=(), *, location_available=False
+):
     """One disposition per input row; no arbitrary strings or current values escape."""
     definitions = configuration.get("values", [])
     rows = values.get("values", [])
     identifiers = [d.get("id") if isinstance(d, dict) else None for d in definitions]
     counts = Counter(k for k in identifiers if type(k) is str and k in CANDIDATES)
     result = []
+    angle_schema = levelling_supported(configuration)
     for index, definition in enumerate(definitions):
         raw = definition.get("id") if isinstance(definition, dict) else None
         key = raw if type(raw) is str and raw in CANDIDATES else None
@@ -240,26 +244,35 @@ def inventory(configuration, values, readings, controls, identified_equipment=()
             else "unknown"
         )
         disposition, reason = "unsupported", "implementation_not_reviewed"
+        derived_angle = key in AXES and angle_schema
+        private_location = key in GPS_IDS and location_available
         if key is None:
             disposition, reason = "unsupported", "unknown_identifier_redacted"
             kind, config = "unknown", {}
         elif key in EXCLUDED:
             disposition, reason = "excluded", "privacy_or_administrative_data"
             kind, config = "unknown", {}
+            if private_location:
+                reason = "coordinates_excluded_native_tracker_available"
         elif counts[key] != 1:
             reason = "duplicate_definition"
         elif config.get("id") != key or kind == "unknown":
             reason = "invalid_definition"
-        elif key in readings or key in WRITE_CONTROLS:
+        elif key in readings or key in WRITE_CONTROLS or derived_angle:
             disposition, reason = "implemented", "reviewed_native_mapping"
         matches = [r for r in rows if isinstance(r, dict) and r.get("device") == key] if key else []
         if (
             disposition == "implemented"
             and key not in readings
+            and not derived_angle
             and not any(c in controls for c, _, _ in WRITE_CONTROLS.get(key, ()))
         ):
             disposition, reason = "unsupported", "definition_or_context_not_eligible"
-        read = disposition == "implemented" and readings.get(key) is not None
+        read = disposition == "implemented" and (
+            all(readings.get(k) is not None for k in ANGLE_KEYS)
+            if derived_angle
+            else readings.get(key) is not None
+        )
         commands = WRITE_CONTROLS.get(key, ()) if disposition == "implemented" else ()
         optional = next((c.equipment for c in CURRENT_CONTROLS if c.key == key), None)
         if disposition == "implemented" and optional and optional not in identified_equipment:
@@ -276,6 +289,10 @@ def inventory(configuration, values, readings, controls, identified_equipment=()
             READ_DOMAINS.get(key, ()) if key in readings and disposition == "implemented" else ()
         )
         domains.update(d for d, _ in available)
+        if derived_angle and disposition == "implemented":
+            domains.add("sensor")
+        if private_location:
+            domains.add("device_tracker")
         known_categories = CATEGORIES.get(key, ())
         raw_categories = config.get("categories")
         ids = (

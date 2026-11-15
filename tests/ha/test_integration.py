@@ -405,3 +405,75 @@ async def test_native_diagnostics_are_additive_and_share_reads(hass, backend, di
     assert registry.async_get(original).name == "Owner room"
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert all(c.closed for c in backend.clients)
+
+
+async def test_native_position_lifecycle_preserves_identity_and_private_location(hass, backend):
+    import json
+
+    from custom_components.adria_mach.client.position import Location
+    from custom_components.adria_mach.diagnostics import async_get_config_entry_diagnostics
+
+    entry = entry_for(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id("device_tracker", DOMAIN, "synthetic-a_location") is None
+    original = temperature_state(hass).entity_id
+    registry.async_update_entity(original, name="Owner room", icon="mdi:home")
+    old = {
+        e.entity_id: (e.unique_id, e.device_id)
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+    options = dict(entry.options)
+    backend.readings.update(levelling_pitch=-10.0, levelling_roll=20.0)
+    backend.location = Location(10.125, -20.25)
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert backend.reads == 2  # One shared snapshot, no tracker or angle-specific request.
+    for key, expected in (("levelling_pitch", "-10.0"), ("levelling_roll", "20.0")):
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, "synthetic-a_" + key)
+        state = hass.states.get(entity_id)
+        assert state.state == expected
+        assert state.attributes["unit_of_measurement"] == "°"
+        assert state.attributes["state_class"] == "measurement"
+        assert registry.async_get(entity_id).device_id == old[original][1]
+    tracker = registry.async_get_entity_id("device_tracker", DOMAIN, "synthetic-a_location")
+    assert registry.async_get(tracker).disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert hass.states.get(tracker) is None
+    registry.async_update_entity(tracker, disabled_by=None)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    state = hass.states.get(tracker)
+    assert state.attributes["latitude"] == 10.125
+    assert state.attributes["longitude"] == -20.25
+    assert state.attributes["source_type"] == "gps"
+    assert state.state == "not_home"
+    backend.location = None
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(tracker).state == "unavailable"
+    assert hass.states.get(tracker).attributes.get("latitude") is None
+    assert hass.states.get(tracker).attributes.get("longitude") is None
+    backend.location = Location(11.125, -21.25)
+    await entry.runtime_data.async_refresh()
+    backend.read_error = MachError("transport_failure")
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(tracker).state == "unavailable"
+    assert hass.states.get(tracker).attributes.get("latitude") is None
+    backend.read_error = None
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(tracker).attributes["latitude"] == 11.125
+    report = json.dumps(await async_get_config_entry_diagnostics(hass, entry), default=str)
+    assert all(value not in report for value in ("10.125", "-20.25", "11.125", "-21.25"))
+    count = len(er.async_entries_for_config_entry(registry, entry.entry_id))
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == count
+    assert registry.async_get_entity_id("device_tracker", DOMAIN, "synthetic-a_location") == tracker
+    assert {
+        key: (registry.async_get(key).unique_id, registry.async_get(key).device_id) for key in old
+    } == old
+    assert registry.async_get(original).name == "Owner room"
+    assert registry.async_get(original).icon == "mdi:home"
+    assert dict(entry.options) == options
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert all(client.closed for client in backend.clients)

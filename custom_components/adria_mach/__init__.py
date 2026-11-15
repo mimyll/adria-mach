@@ -68,6 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MachConfigEntry) -> bool
             entry,
             [
                 Platform.SENSOR,
+                Platform.DEVICE_TRACKER,
                 Platform.BINARY_SENSOR,
                 Platform.LIGHT,
                 Platform.NUMBER,
@@ -98,6 +99,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: MachConfigEntry) -> boo
         entry,
         [
             Platform.SENSOR,
+            Platform.DEVICE_TRACKER,
             Platform.BINARY_SENSOR,
             Platform.LIGHT,
             Platform.NUMBER,

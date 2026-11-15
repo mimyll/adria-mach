@@ -1,6 +1,7 @@
 """Production parser and actual HTTP transport, with synthetic account data."""
 
 import asyncio
+import math
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from types import SimpleNamespace
@@ -618,11 +619,11 @@ def set_temperature(state, value):
 
 async def test_live_reuses_epoch_invalidates_with_full_read_and_closes_borrowed_connector(
     live_wire,
-    diagnostic_snapshot,
+    position_snapshot,
 ):
     state = live_wire
-    state.configuration = diagnostic_snapshot["configuration"]
-    state.values = diagnostic_snapshot["values"]
+    state.configuration = position_snapshot["configuration"]
+    state.values = position_snapshot["values"]
     connector = aiohttp.TCPConnector()
     client = portal.MachClient(connector, persistent=True)
     published = []
@@ -642,6 +643,7 @@ async def test_live_reuses_epoch_invalidates_with_full_read_and_closes_borrowed_
             state.streams[0].put_nowait(value_event(7))
         await eventually(lambda: published)
         assert published[-1].temperature == 7
+        await eventually(lambda: client.live.maintenance is None)
         count = state.calls.count("getValuesAll")
         for _ in range(5):
             state.streams[0].put_nowait(value_event(7))
@@ -652,16 +654,27 @@ async def test_live_reuses_epoch_invalidates_with_full_read_and_closes_borrowed_
         state.streams[0].put_nowait(value_event(99, key="LTE_SIGNAL_STRENGTH"))
         await eventually(lambda: published[-1].values.get("LTE_SIGNAL_STRENGTH") == 61)
         assert published[-1].values["mach_software_version"] == "9.8.7 2030-01-02"
+        await eventually(lambda: client.live.maintenance is None)
         count = state.calls.count("getValuesAll")
         state.streams[0].put_nowait(value_event(61, key="LTE_SIGNAL_STRENGTH"))
         await asyncio.sleep(0.03)
         assert state.calls.count("getValuesAll") == count
+        row = next(r for r in state.values["values"] if r["device"] == "GPS_LONGITUDE")
+        row["status"] = -21.75
+        state.streams[0].put_nowait(value_event(42.75, key="GPS_LONGITUDE"))
+        await eventually(lambda: published[-1].location.longitude == -21.75)
+        row = next(r for r in state.values["values"] if r["device"] == "ACCELERATION_Y")
+        row["status"] = math.tan(math.radians(10))
+        state.streams[0].put_nowait(value_event(-0.9, key="ACCELERATION_Y"))
+        await eventually(lambda: published[-1].values["levelling_pitch"] == pytest.approx(-10))
+        assert "GPS_LONGITUDE" not in published[-1].values
         assert state.calls.count("handshake") == state.calls.count("stream") == 1
         assert set(state.calls) <= {"handshake", "stream", "getMachConfiguration", "getValuesAll"}
     finally:
         await client.close()
-    assert not connector.closed
-    await connector.close()
+        borrowed_connector_open = not connector.closed
+        await connector.close()
+    assert borrowed_connector_open
     assert client.live.pump is None and client.live.maintenance is None
 
 
@@ -903,3 +916,163 @@ def test_lte_readonly_projection_accepts_optional_writability(diagnostic_snapsho
         assert "LTE_VALUE" not in actual and "USER_ALLOWS_ROAMING" not in actual
     else:
         assert actual["LTE_VALUE"] is True and actual["USER_ALLOWS_ROAMING"] is False
+
+
+def set_position(data, **updates):
+    for key, value in updates.items():
+        next(row for row in data["values"]["values"] if row["device"] == key)["status"] = value
+
+
+@pytest.mark.parametrize(
+    "vector,expected",
+    [
+        ((0, math.tan(math.radians(10)), 1), (-10, 0)),
+        ((math.tan(math.radians(-20)), 0, 1), (0, -20)),
+        ((1, 0, 0), (0, 0)),
+    ],
+)
+def test_levelling_axes_and_signs(position_snapshot, vector, expected):
+    from custom_components.adria_mach.client.position import ANGLE_KEYS, AXES, Levelling
+
+    set_position(position_snapshot, **dict(zip(AXES, vector, strict=True)))
+    actual = Levelling().readings(position_snapshot["configuration"], position_snapshot["values"])
+    assert tuple(actual[k] for k in ANGLE_KEYS) == pytest.approx(expected)
+
+
+async def test_levelling_calibration_and_mounting_context(position_snapshot):
+    from custom_components.adria_mach.client.position import AXES, OFFSETS, Levelling
+
+    config, values = position_snapshot["configuration"], position_snapshot["values"]
+    levelling = Levelling()
+    assert levelling.readings(config, values)["levelling_roll"] == 0
+    set_position(position_snapshot, ACCELERATION_X=1, ACCELERATION_Z=0)
+    assert levelling.readings(config, values)["levelling_roll"] == 90  # Latched horizontal.
+    assert Levelling().readings(config, values)["levelling_roll"] == 0  # Fresh vertical.
+    for key, value in zip(OFFSETS, (0, 0, 1), strict=True):
+        config["values"].append(
+            {"id": key, "config": {"id": key, "type": "float", "writable": True}}
+        )
+        values["values"].append({"device": key, "status": value})
+    assert levelling.readings(config, values)["levelling_roll"] == 0  # Calibration reset.
+    for key, value in zip(OFFSETS, (0.1, 0.2, 0.9), strict=True):
+        set_position(position_snapshot, **{key: value})
+    set_position(position_snapshot, **dict(zip(AXES, (0.1, 0.2, 0.9), strict=True)))
+    assert tuple(levelling.readings(config, values).values()) == pytest.approx((0, 0))
+    client = portal.MachClient()
+    first = client._observed(config, values, "synthetic-a")
+    set_position(position_snapshot, **dict(zip(AXES, (1, 0, 0), strict=True)))
+    retained = client._observed(config, values, "synthetic-a")
+    changed = client._observed(config, values, "synthetic-b")
+    assert first.values["levelling_roll"] == 0
+    assert retained.values["levelling_roll"] != changed.values["levelling_roll"]
+    client._levelling_device = None  # The authenticated-session reset boundary.
+    assert client._observed(config, values, "synthetic-a").values == changed.values
+    await client.close()
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "bool",
+        "null",
+        "nan",
+        "infinity",
+        "sentinel",
+        "tiny_sentinel",
+        "zero",
+        "duplicate_row",
+        "missing_row",
+        "duplicate_definition",
+        "mismatch",
+        "writable",
+        "missing_writable",
+        "string_type",
+        "partial_offsets",
+    ],
+)
+def test_invalid_levelling_is_grouped_and_isolated(position_snapshot, fault):
+    from copy import deepcopy
+
+    from custom_components.adria_mach.client.position import ANGLE_KEYS
+
+    config, values = position_snapshot["configuration"], position_snapshot["values"]
+    definition = next(r for r in config["values"] if r["id"] == "ACCELERATION_X")
+    row = next(r for r in values["values"] if r["device"] == "ACCELERATION_X")
+    invalid = {
+        "bool": True,
+        "null": None,
+        "nan": math.nan,
+        "infinity": math.inf,
+        "sentinel": -9007199254740991,
+        "tiny_sentinel": 5e-324,
+    }
+    if fault in invalid:
+        row["status"] = invalid[fault]
+    elif fault == "zero":
+        set_position(position_snapshot, ACCELERATION_Z=0)
+    elif fault == "duplicate_row":
+        values["values"].append(deepcopy(row))
+    elif fault == "missing_row":
+        values["values"].remove(row)
+    elif fault == "duplicate_definition":
+        config["values"].append(deepcopy(definition))
+    elif fault == "mismatch":
+        definition["config"]["id"] = "OTHER"
+    elif fault == "writable":
+        definition["config"]["writable"] = True
+    elif fault == "missing_writable":
+        definition["config"].pop("writable")
+    elif fault == "string_type":
+        definition["config"]["type"] = "string"
+    else:
+        key = "ACCELERATION_X_ZERO_POSITION_OFFSET"
+        config["values"].append(
+            {"id": key, "config": {"id": key, "type": "float", "writable": True}}
+        )
+        values["values"].append({"device": key, "status": 0})
+    actual = readings_from(config, values)
+    assert all(actual[key] is None for key in ANGLE_KEYS)
+    assert actual[VALUE_ID] == 0
+
+
+@pytest.mark.parametrize(
+    "latitude,longitude,valid",
+    [
+        (10.125, -20.25, True),
+        (-90, 180, True),
+        (90, -180, True),
+        (0, 20, False),
+        (10, 0, False),
+        (90.1, 20, False),
+        (10, -180.1, False),
+        (True, 20, False),
+        (10, None, False),
+        (math.nan, 20, False),
+        (10, math.inf, False),
+    ],
+)
+async def test_location_is_private_paired_and_not_retained(
+    position_snapshot, latitude, longitude, valid
+):
+    from dataclasses import FrozenInstanceError
+
+    from custom_components.adria_mach.client.position import GPS_IDS, location_from
+
+    config, values = position_snapshot["configuration"], position_snapshot["values"]
+    initial = location_from(config, values)
+    with pytest.raises(FrozenInstanceError):
+        initial.latitude = 42
+    assert "10.125" not in repr(initial)
+    set_position(position_snapshot, GPS_LATITUDE=latitude, GPS_LONGITUDE=longitude)
+    measurement = portal.MachClient.measurement(config, values, "synthetic-a")
+    assert (measurement.location is not None) is valid
+    if valid:
+        assert (measurement.location.latitude, measurement.location.longitude) == (
+            latitude,
+            longitude,
+        )
+    assert not set(GPS_IDS) & measurement.values.keys()
+    assert "10.125" not in repr(measurement)
+    set_position(position_snapshot, GPS_LATITUDE=11.125, GPS_LONGITUDE=-21.25)
+    recovered = location_from(config, values)
+    assert (recovered.latitude, recovered.longitude) == (11.125, -21.25)

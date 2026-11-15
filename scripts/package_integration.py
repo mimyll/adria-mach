@@ -18,6 +18,8 @@ FILES = (
     "client/capabilities.py",
     "client/model.py",
     "client/telemetry.py",
+    "client/position.py",
+    "device_tracker.py",
     "client/outside.py",
     "client/control_model.py",
     "client/commands.py",

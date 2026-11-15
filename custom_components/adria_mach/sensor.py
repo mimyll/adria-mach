@@ -15,8 +15,9 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 
+from .client.telemetry import POWER_STATES, SIM_STATES
 from .const import VALUE_ID
-from .entity import MachEntity
+from .entity import MachEntity, async_discover_diagnostics
 
 SENSORS = (
     SensorEntityDescription(
@@ -99,6 +100,58 @@ SENSORS = (
     ),
 )
 
+DIAGNOSTIC_SENSORS = (
+    SensorEntityDescription(
+        key="LTE_OPERATOR_NAME", translation_key="mobile_operator", icon="mdi:sim"
+    ),
+    SensorEntityDescription(
+        key="LTE_COMMUNICATION_STANDARD", translation_key="mobile_technology", icon="mdi:network"
+    ),
+    SensorEntityDescription(
+        key="LTE_REGISTRATION_STATUS", translation_key="network_registration", icon="mdi:network"
+    ),
+    SensorEntityDescription(
+        key="LTE_SIGNAL_STRENGTH",
+        translation_key="mobile_signal_quality",
+        native_unit_of_measurement=PERCENTAGE,
+        icon="mdi:signal",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="LTE_SIM_VALUE",
+        translation_key="sim_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(SIM_STATES),
+        icon="mdi:sim",
+    ),
+    SensorEntityDescription(
+        key="SYSTEM_POWER_REGIME",
+        translation_key="device_power_mode",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(POWER_STATES),
+        icon="mdi:power-sleep",
+    ),
+    *(
+        SensorEntityDescription(key=key, translation_key=translation, icon="mdi:chip")
+        for key, translation in (
+            ("mach_software_version", "mach_software_version"),
+            ("mach_os_release", "mach_os_release"),
+            ("mach_release_channel", "mach_release_channel"),
+            ("SYSTEM_IO_FIRMWARE_VERSION", "io_firmware_version"),
+            ("SYSTEM_FIRMWARE_VERSION_MCU_1", "mcu_1_firmware_version"),
+            ("SYSTEM_FIRMWARE_VERSION_MCU_2", "mcu_2_firmware_version"),
+            ("PANEL_VERSION", "panel_firmware_version"),
+        )
+    ),
+)
+
+LAST_READ = SensorEntityDescription(
+    key="last_successful_read",
+    translation_key="last_successful_read",
+    device_class=SensorDeviceClass.TIMESTAMP,
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = entry.runtime_data
@@ -108,18 +161,35 @@ async def async_setup_entry(hass, entry, async_add_entities):
             for description in SENSORS
             if description.key in coordinator.data.values
         ]
+        + [MachLastReadSensor(coordinator, LAST_READ)]
         + (
             [MachCapabilitySensor(coordinator, CAPABILITIES)]
             if coordinator.data.capabilities
             else []
         )
     )
+    async_discover_diagnostics(entry, DIAGNOSTIC_SENSORS, MachDiagnosticSensor, async_add_entities)
 
 
 class MachSensor(MachEntity, SensorEntity):
     @property
     def native_value(self):
         return self.reading
+
+
+class MachDiagnosticSensor(MachSensor):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+
+class MachLastReadSensor(MachSensor):
+    @property
+    def reading(self):
+        return self.coordinator.data.received_at
+
+    @property
+    def available(self):
+        # A failed refresh does not erase the time of the last successful receipt.
+        return self.coordinator.data is not None
 
 
 CAPABILITIES = SensorEntityDescription(

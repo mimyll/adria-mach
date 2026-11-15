@@ -8,11 +8,13 @@ from .control_model import Case, HeatingControl, ManualControl, WaterControl
 from .master import MasterControl
 from .operational import CURRENT_CONTROLS, EquipmentControl
 from .outside import OutsideControl
+from .telemetry import DIAGNOSTIC_FIELDS
 
 # Reviewed public technical symbols, not a lexical test of untrusted identifiers.
 # Source and predicates: technical-capability-audit-2026-11-13/digests/public-catalog-r1.md.
 CANDIDATES = (
     frozenset(FIELDS)
+    | frozenset(DIAGNOSTIC_FIELDS)
     | frozenset(
         """
     AIR_HEATER_MODE AIR_HEATER_VENTILATION_SPEED WANTED_TEMPERATURE_BED BED_HEATER_WORKING
@@ -88,7 +90,9 @@ CANDIDATES = (
     )
 )
 EXCLUDED = frozenset(
-    k for k in CANDIDATES if k.startswith("GPS_") or k.endswith(("_ADDRESS", "_NAME"))
+    k
+    for k in CANDIDATES
+    if k.startswith("GPS_") or (k.endswith(("_ADDRESS", "_NAME")) and k != "LTE_OPERATOR_NAME")
 ) | {"SYSTEM_PENDING_VALUE_IDS"}
 UNITS = {
     "LIVING_MEASURED_TEMPERATURE": "°C",
@@ -101,6 +105,7 @@ UNITS = {
     "LIVING_BATTERY_CURRENT": "A",
     "FRESH_WATER_LEVEL": "%",
     "WASTE_WATER_LEVEL": "%",
+    "LTE_SIGNAL_STRENGTH": "%",
 }
 RANGES = {"AIR_HEATER_TEMPERATURE": (5, 30)} | {
     c.key: (1, 50) for c in (*Case, *OutsideControl) if c.individual_light
@@ -125,6 +130,12 @@ CATEGORIES.update({c.key: ("off", "on") for c in MasterControl})
 READ_DOMAINS = {
     k: ("binary_sensor",) if f.kind == "binary" else ("sensor",) for k, f in FIELDS.items()
 }
+READ_DOMAINS.update(
+    {
+        k: ("binary_sensor",) if f.kind == "binary" else ("sensor",)
+        for k, f in DIAGNOSTIC_FIELDS.items()
+    }
+)
 WRITE_CONTROLS = (
     {
         OutsideControl.BINARY.key: ((OutsideControl.BINARY.value, "light", "manual_outside"),),

@@ -213,7 +213,9 @@ async def test_native_verified_catalog_metadata_translation_and_shared_availabil
     }
     registry = er.async_get(hass)
     registered = er.async_entries_for_config_entry(registry, entry.entry_id)
-    assert {e.unique_id.removeprefix("synthetic-a_") for e in registered} == expected.keys()
+    assert {e.unique_id.removeprefix("synthetic-a_") for e in registered} == expected.keys() | {
+        "last_successful_read"
+    }
     assert len({e.device_id for e in registered}) == 1 and backend.reads == 1
 
     def state_for(key):
@@ -301,7 +303,7 @@ async def test_upgrade_preserves_existing_living_registration_and_user_settings(
     assert devices.async_get(device.id).area_id == area.id
     assert devices.async_get(device.id).name_by_user == "Owner caravan"
     registered = er.async_entries_for_config_entry(registry, entry.entry_id)
-    assert len(registered) == 18 and {e.device_id for e in registered} == {device.id}
+    assert len(registered) == 19 and {e.device_id for e in registered} == {device.id}
     assert len([e for e in registered if e.unique_id == old.unique_id]) == 1
     assert (hass.states.get(old.entity_id) is None) == (disabled is not None)
 
@@ -313,5 +315,86 @@ async def test_initially_unsupported_optional_field_is_not_created(hass, backend
     await hass.async_block_till_done()
     registry = er.async_get(hass)
     assert registry.async_get_entity_id("binary_sensor", DOMAIN, "synthetic-a_AUX_VALUE") is None
-    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == 17
+    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == 18
     assert temperature_state(hass).state == "0"
+
+
+async def test_native_diagnostics_are_additive_and_share_reads(hass, backend, diagnostic_snapshot):
+    from homeassistant.const import EntityCategory
+
+    from custom_components.adria_mach.diagnostics import async_get_config_entry_diagnostics
+
+    backend.readings.update(LTE_SIGNAL_STRENGTH=None, LTE_VALUE=None)
+    entry = entry_for(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id("sensor", DOMAIN, "synthetic-a_LTE_SIGNAL_STRENGTH") is None
+    assert registry.async_get_entity_id("binary_sensor", DOMAIN, "synthetic-a_LTE_VALUE") is None
+    old = {
+        e.entity_id: (e.unique_id, e.device_id)
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+    original = temperature_state(hass).entity_id
+    registry.async_update_entity(original, name="Owner room", icon="mdi:home")
+    backend.readings = dict(diagnostic_snapshot["normalized"])
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    expected = {
+        "LTE_VALUE": ("binary_sensor", "on", None, None),
+        "USER_ALLOWS_ROAMING": ("binary_sensor", "off", None, None),
+        "LTE_OPERATOR_NAME": ("sensor", "Example Mobile", None, None),
+        "LTE_COMMUNICATION_STANDARD": ("sensor", "4G", None, None),
+        "LTE_REGISTRATION_STATUS": ("sensor", "ROAMING", None, None),
+        "LTE_SIGNAL_STRENGTH": ("sensor", "73", "%", None),
+        "LTE_SIM_VALUE": ("sensor", "SIM_READY", None, "enum"),
+        "SYSTEM_POWER_REGIME": ("sensor", "SLEEP", None, "enum"),
+        "SYSTEM_IO_FIRMWARE_VERSION": ("sensor", "03.004.005", None, None),
+        "SYSTEM_FIRMWARE_VERSION_MCU_1": ("sensor", "2.3-beta", None, None),
+        "mach_software_version": ("sensor", "9.8.7 2030-01-02", None, None),
+        "mach_os_release": ("sensor", "2030-01-02", None, None),
+        "mach_release_channel": ("sensor", "PRODUCTION", None, None),
+    }
+    for key, (domain, value, unit, device_class) in expected.items():
+        entity_id = registry.async_get_entity_id(domain, DOMAIN, "synthetic-a_" + key)
+        record = registry.async_get(entity_id)
+        state = hass.states.get(entity_id)
+        assert record.entity_category is EntityCategory.DIAGNOSTIC
+        assert record.device_id == old[original][1]
+        assert (
+            state.state,
+            state.attributes.get("unit_of_measurement"),
+            state.attributes.get("device_class"),
+        ) == (value, unit, device_class)
+    assert registry.async_get_entity_id("sensor", DOMAIN, "synthetic-a_PANEL_VERSION") is None
+    assert backend.reads == 2
+    assert {
+        k: (registry.async_get(k).unique_id, registry.async_get(k).device_id) for k in old
+    } == old
+    assert registry.async_get(original).name == "Owner room"
+    assert registry.async_get(original).icon == "mdi:home"
+    timestamp = registry.async_get_entity_id("sensor", DOMAIN, "synthetic-a_last_successful_read")
+    last_read = hass.states.get(timestamp).state
+    assert hass.states.get(timestamp).attributes["device_class"] == "timestamp"
+    backend.read_error = MachError("transport_failure")
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(timestamp).state == last_read
+    backend.read_error = None
+    backend.readings["LTE_SIGNAL_STRENGTH"] = None
+    await entry.runtime_data.async_refresh()
+    signal = registry.async_get_entity_id("sensor", DOMAIN, "synthetic-a_LTE_SIGNAL_STRENGTH")
+    assert hass.states.get(signal).state == "unavailable"
+    assert temperature_state(hass).state == "0"
+    backend.readings["LTE_SIGNAL_STRENGTH"] = 54
+    await entry.runtime_data.async_refresh()
+    assert hass.states.get(signal).state == "54"
+    report = await async_get_config_entry_diagnostics(hass, entry)
+    assert report["device_diagnostics"]["mach_software_version"] == "9.8.7 2030-01-02"
+    assert report["source_sample_at"] is None
+    count = len(er.async_entries_for_config_entry(registry, entry.entry_id))
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == count
+    assert registry.async_get(original).name == "Owner room"
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert all(c.closed for c in backend.clients)

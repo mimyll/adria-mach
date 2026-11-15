@@ -534,6 +534,7 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
         rpc_entered=asyncio.Event(),
         rpc_release=None,
         during_read=None,
+        configuration=full_snapshot["configuration"],
     )
 
     async def handler(request):
@@ -571,7 +572,7 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
             return web.json_response(
                 {
                     "status": state.app_status,
-                    "payload": full_snapshot["configuration"],
+                    "payload": state.configuration,
                 }
             )
         data = deepcopy(state.values)
@@ -617,8 +618,11 @@ def set_temperature(state, value):
 
 async def test_live_reuses_epoch_invalidates_with_full_read_and_closes_borrowed_connector(
     live_wire,
+    diagnostic_snapshot,
 ):
     state = live_wire
+    state.configuration = diagnostic_snapshot["configuration"]
+    state.values = diagnostic_snapshot["values"]
     connector = aiohttp.TCPConnector()
     client = portal.MachClient(connector, persistent=True)
     published = []
@@ -643,6 +647,17 @@ async def test_live_reuses_epoch_invalidates_with_full_read_and_closes_borrowed_
             state.streams[0].put_nowait(value_event(7))
         await asyncio.sleep(0.03)
         assert state.calls.count("getValuesAll") == count
+        row = next(r for r in state.values["values"] if r["device"] == "LTE_SIGNAL_STRENGTH")
+        row["status"] = 61
+        state.streams[0].put_nowait(value_event(99, key="LTE_SIGNAL_STRENGTH"))
+        await eventually(lambda: published[-1].values.get("LTE_SIGNAL_STRENGTH") == 61)
+        assert published[-1].values["mach_software_version"] == "9.8.7 2030-01-02"
+        count = state.calls.count("getValuesAll")
+        state.streams[0].put_nowait(value_event(61, key="LTE_SIGNAL_STRENGTH"))
+        await asyncio.sleep(0.03)
+        assert state.calls.count("getValuesAll") == count
+        assert state.calls.count("handshake") == state.calls.count("stream") == 1
+        assert set(state.calls) <= {"handshake", "stream", "getMachConfiguration", "getValuesAll"}
     finally:
         await client.close()
     assert not connector.closed
@@ -754,3 +769,137 @@ async def test_live_cancelled_readiness_joins_owned_stream(loopback, monkeypatch
     finally:
         release.set()
         await client.close()
+
+
+def test_diagnostic_projection_preserves_versions_and_excludes_private_fields(diagnostic_snapshot):
+    import json
+
+    from custom_components.adria_mach.client.capabilities import inventory
+
+    config, values = diagnostic_snapshot["configuration"], diagnostic_snapshot["values"]
+    for key in (
+        "LTE_SIM_APN_VALUE",
+        "LTE_SIM_ID_VALUE",
+        "LTE_SIM_PASSWORD_VALUE",
+        "LTE_SIM_PIN_VALUE",
+        "GPS_LATITUDE",
+        "UNKNOWN_PRIVATE_FIELD",
+    ):
+        config["values"].append(
+            {
+                "id": key,
+                "config": {
+                    "id": key,
+                    "type": "string",
+                    "writable": False,
+                    "label": "PRIVATE_MARKER",
+                },
+            }
+        )
+        values["values"].append({"device": key, "status": "PRIVATE_MARKER"})
+    config["private_extra"] = "PRIVATE_MARKER"
+    actual = readings_from(config, values)
+    assert actual == diagnostic_snapshot["normalized"]
+    assert "PRIVATE_MARKER" not in json.dumps(actual)
+    report = inventory(config, values, actual, {})
+    assert "PRIVATE_MARKER" not in json.dumps(report.export())
+    operator = next(r for r in report.definitions if r.identifier == "LTE_OPERATOR_NAME")
+    assert operator.disposition == "implemented" and operator.native_domains == ("sensor",)
+    assert not operator.control_available
+
+
+@pytest.mark.parametrize(
+    "value", [0, -1, -9007199254740991, True, float("nan"), float("inf"), 101, "73", None, 10**500]
+)
+def test_invalid_signal_is_not_a_zero_or_connection_claim(diagnostic_snapshot, value):
+    values = diagnostic_snapshot["values"]
+    next(r for r in values["values"] if r["device"] == "LTE_SIGNAL_STRENGTH")["status"] = value
+    result = readings_from(diagnostic_snapshot["configuration"], values)
+    assert result["LTE_SIGNAL_STRENGTH"] is None
+    assert result[VALUE_ID] == 0
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "absent",
+        "duplicate",
+        "mismatch",
+        "type",
+        "writable",
+        "no_state",
+        "missing_row",
+        "duplicate_row",
+    ],
+)
+def test_optional_diagnostic_schema_and_row_failures_are_isolated(diagnostic_snapshot, change):
+    config, values = diagnostic_snapshot["configuration"], diagnostic_snapshot["values"]
+    key = "SYSTEM_IO_FIRMWARE_VERSION"
+    definition = next(r for r in config["values"] if r["id"] == key)
+    row = next(r for r in values["values"] if r["device"] == key)
+    if change == "absent":
+        config["values"].remove(definition)
+    elif change == "duplicate":
+        config["values"].append(deepcopy(definition))
+    elif change == "missing_row":
+        values["values"].remove(row)
+    elif change == "duplicate_row":
+        values["values"].append(deepcopy(row))
+    else:
+        field, value = {
+            "mismatch": ("id", "OTHER"),
+            "type": ("type", "integer"),
+            "writable": ("writable", True),
+            "no_state": ("hasState", False),
+        }[change]
+        definition["config"][field] = value
+    result = readings_from(config, values)
+    assert result.get(key) is None and result["LTE_SIGNAL_STRENGTH"] == 73
+    assert "SYSTEM_FIRMWARE_VERSION_MCU_2" not in result and "PANEL_VERSION" not in result
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("LTE_OPERATOR_NAME", "Example\nSECRET"),
+        ("LTE_OPERATOR_NAME", "x" * 65),
+        ("LTE_OPERATOR_NAME", "user@example.invalid"),
+        ("LTE_VALUE", True),
+        ("LTE_SIM_VALUE", "UNVERIFIED_STATE"),
+        ("SYSTEM_POWER_REGIME", "UNVERIFIED_MODE"),
+        ("SYSTEM_IO_FIRMWARE_VERSION", "unknown"),
+        ("SYSTEM_IO_FIRMWARE_VERSION", "x" * 97),
+        ("LTE_REGISTRATION_STATUS", "<private>"),
+    ],
+)
+def test_invalid_diagnostic_text_does_not_escape(diagnostic_snapshot, key, value):
+    config, values = diagnostic_snapshot["configuration"], diagnostic_snapshot["values"]
+    next(r for r in values["values"] if r["device"] == key)["status"] = value
+    actual = readings_from(config, values)
+    assert actual[key] is None and actual[VALUE_ID] == 0
+
+
+def test_missing_and_malformed_metadata_never_invent_versions(diagnostic_snapshot):
+    config, values = diagnostic_snapshot["configuration"], diagnostic_snapshot["values"]
+    config.pop("version")
+    config["osReleaseDate"] = "2030-02-30"
+    config["releaseType"] = "PRIVATE\nMARKER"
+    actual = readings_from(config, values)
+    assert not {"mach_software_version", "mach_os_release", "mach_release_channel"} & actual.keys()
+    assert actual["SYSTEM_IO_FIRMWARE_VERSION"] == "03.004.005"
+
+
+@pytest.mark.parametrize("metadata", ["missing", None, False, True, "invalid"])
+def test_lte_readonly_projection_accepts_optional_writability(diagnostic_snapshot, metadata):
+    config, values = diagnostic_snapshot["configuration"], diagnostic_snapshot["values"]
+    for key in ("LTE_VALUE", "USER_ALLOWS_ROAMING"):
+        definition = next(r["config"] for r in config["values"] if r["id"] == key)
+        if metadata == "missing":
+            definition.pop("writable")
+        else:
+            definition["writable"] = metadata
+    actual = readings_from(config, values)
+    if metadata == "invalid":
+        assert "LTE_VALUE" not in actual and "USER_ALLOWS_ROAMING" not in actual
+    else:
+        assert actual["LTE_VALUE"] is True and actual["USER_ALLOWS_ROAMING"] is False

@@ -12,11 +12,13 @@ from .master import MasterControl
 from .model import AuthenticationError, MachError
 from .operational import CURRENT_CONTROLS
 from .outside import OutsideControl
+from .telemetry import DIAGNOSTIC_FIELDS
 
 REFRESH_DELAY = 0.25
 RECONNECT_DELAYS = (2, 4, 8, 16, 30)
 KNOWN_IDS = (
     frozenset(FIELDS)
+    | frozenset(DIAGNOSTIC_FIELDS)
     | frozenset(CONTEXT_KEYS)
     | {
         c.key

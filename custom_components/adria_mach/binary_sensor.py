@@ -5,8 +5,9 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.const import EntityCategory
 
-from .entity import MachEntity
+from .entity import MachEntity, async_discover_diagnostics
 
 BINARY_SENSORS = (
     BinarySensorEntityDescription(
@@ -39,6 +40,21 @@ BINARY_SENSORS = (
     ),
 )
 
+DIAGNOSTIC_BINARY_SENSORS = (
+    BinarySensorEntityDescription(
+        key="LTE_VALUE",
+        translation_key="lte_enabled",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:network",
+    ),
+    BinarySensorEntityDescription(
+        key="USER_ALLOWS_ROAMING",
+        translation_key="roaming_permitted",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:network",
+    ),
+)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = entry.runtime_data
@@ -48,6 +64,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
             for description in BINARY_SENSORS
             if description.key in coordinator.data.values
         ]
+    )
+    async_discover_diagnostics(
+        entry, DIAGNOSTIC_BINARY_SENSORS, MachBinarySensor, async_add_entities
     )
 
 

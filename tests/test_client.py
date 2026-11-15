@@ -926,15 +926,19 @@ def set_position(data, **updates):
         next(row for row in data["values"]["values"] if row["device"] == key)["status"] = value
 
 
-async def test_vehicle_metadata_mapping_privacy_and_snapshot_replacement(vehicle_snapshot):
+@pytest.mark.parametrize("chassis_number", ["000-TEST-CHASSIS", "*000-TEST-CHASSIS*"])
+async def test_vehicle_metadata_mapping_privacy_and_snapshot_replacement(
+    vehicle_snapshot, chassis_number
+):
     from dataclasses import FrozenInstanceError
 
     from custom_components.adria_mach.client.vehicle import VehicleInfo
 
     config, values = vehicle_snapshot["configuration"], vehicle_snapshot["values"]
+    config["system"]["vehicle"]["chassis"]["number"] = chassis_number
     expected = {
         "vehicle_model": "Example 700 (Test)",
-        "chassis_number": "000-TEST-CHASSIS",
+        "chassis_number": chassis_number,
         "vehicle_height": 2710,
         "vehicle_length": 7123,
         "vehicle_length_with_towbar": 8543.5,
@@ -945,10 +949,10 @@ async def test_vehicle_metadata_mapping_privacy_and_snapshot_replacement(vehicle
     assert result.temperature == 0 and result.location is not None
     assert result.values["levelling_pitch"] == 0
     assert not set(expected) & result.values.keys()
-    assert "000-TEST-CHASSIS" not in repr(result) + repr(result.vehicle)
+    assert chassis_number not in repr(result) + repr(result.vehicle)
     copy = VehicleInfo(expected)
     expected["chassis_number"] = "CHANGED"
-    assert copy.values["chassis_number"] == "000-TEST-CHASSIS"
+    assert copy.values["chassis_number"] == chassis_number
     with pytest.raises(TypeError):
         copy.values["chassis_number"] = "CHANGED"
     with pytest.raises(FrozenInstanceError):
@@ -1027,7 +1031,21 @@ async def test_vehicle_malformed_optional_groups_are_isolated(vehicle_snapshot, 
 
 
 @pytest.mark.parametrize(
-    "invalid", [None, 123, "", " ", "x" * 101, "Bad\ntext", "<private>", "Bad\x00text"]
+    "invalid",
+    [
+        None,
+        123,
+        "",
+        " ",
+        "x" * 101,
+        "Bad\ntext",
+        "<private>",
+        "Bad\x00text",
+        "*TEST",
+        "TEST*",
+        "**TEST**",
+        "TE*ST",
+    ],
 )
 def test_vehicle_text_rejects_invalid_data(vehicle_snapshot, invalid):
     from custom_components.adria_mach.client.vehicle import vehicle_from

@@ -490,6 +490,9 @@ async def test_native_vehicle_information_is_private_additive_and_read_only(
     from custom_components.adria_mach.client.vehicle import VehicleInfo, vehicle_from
     from custom_components.adria_mach.diagnostics import async_get_config_entry_diagnostics
 
+    vehicle_snapshot["configuration"]["system"]["vehicle"]["chassis"]["number"] = (
+        "*000-TEST-CHASSIS*"
+    )
     backend.location = Location(10.125, -20.25)
     entry = entry_for(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -550,7 +553,7 @@ async def test_native_vehicle_information_is_private_additive_and_read_only(
     backend.read_error = None
     backend.vehicle = vehicle_from(vehicle_snapshot["configuration"])
     await entry.runtime_data.async_refresh()
-    assert hass.states.get(chassis).state == "000-TEST-CHASSIS"
+    assert hass.states.get(chassis).state == "*000-TEST-CHASSIS*"
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == len(old) + 6

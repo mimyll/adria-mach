@@ -573,3 +573,41 @@ async def test_native_vehicle_information_is_private_additive_and_read_only(
     assert hass.states.get(tracker).attributes["latitude"] == 10.125
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert all(client.closed for client in backend.clients)
+
+
+async def test_stored_renewal_credentials_and_native_failure_handling_preserve_identity(
+    hass, backend
+):
+    entry = entry_for(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    client = backend.clients[-1]
+    registry = er.async_get(hass)
+    initial = registry.async_get(temperature_state(hass).entity_id)
+    identity = (initial.entity_id, initial.unique_id, initial.device_id)
+    options = dict(entry.options)
+    assert client.renewal_device == "synthetic-a"
+    assert client.renewal_credentials() == ("synthetic-user", "synthetic-password")
+    # Callback reads the current entry rather than retaining a stale password copy.
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, CONF_PASSWORD: "updated-secret"}
+    )
+    assert client.renewal_credentials() == ("synthetic-user", "updated-secret")
+    coordinator = entry.runtime_data
+    backend.read_error = MachError("session_renewal_deferred")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert temperature_state(hass).state == "unavailable"
+    assert not hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    backend.read_error = None
+    backend.temperature = 11
+    await coordinator.async_refresh()
+    assert temperature_state(hass).state == "11"
+    current = registry.async_get(initial.entity_id)
+    assert (current.entity_id, current.unique_id, current.device_id) == identity
+    assert entry.options == options and entry.state is config_entries.ConfigEntryState.LOADED
+    backend.read_error = AuthenticationError("authentication_rejected")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert len(flows) == 1 and flows[0]["context"]["source"] == "reauth"

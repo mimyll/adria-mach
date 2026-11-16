@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0
+
+- Automatically renew expired MACH sessions with the credentials stored in Home Assistant.
+- Request manual reauthentication only when fresh authentication is rejected; temporary outages and rate limits remain recoverable.
+- Limit automatic login attempts, retain the assigned vehicle and never replay device commands during renewal.
+
 ## 0.13.1
 
 - Accept chassis numbers enclosed in the manufacturer's asterisk markers, preserving the displayed text and existing privacy protections.

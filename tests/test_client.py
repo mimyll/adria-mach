@@ -539,15 +539,36 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
         rpc_release=None,
         during_read=None,
         configuration=full_snapshot["configuration"],
+        logins=0,
+        login_status=200,
+        login_cookies=[],
+        login_entered=asyncio.Event(),
+        login_release=None,
+        devices=DEVICES,
+        expired=False,
+        expired_status=401,
+        expired_application=False,
+        restore_on_login=True,
     )
 
     async def handler(request):
         path = request.path
         body = await request.json() if request.method == "POST" else None
         if path == "/api/login/login":
-            return web.Response()
+            state.logins += 1
+            state.login_cookies.append(bool(request.cookies))
+            state.login_entered.set()
+            if state.login_release is not None:
+                await state.login_release.wait()
+            if state.login_status != 200:
+                return web.Response(status=state.login_status, headers={"Retry-After": "1"})
+            if state.restore_on_login:
+                state.expired = False
+            response = web.Response()
+            response.set_cookie("session", "synthetic-session-" + str(state.logins))
+            return response
         if path == "/api/user/listMyDevices":
-            return web.json_response(DEVICES)
+            return web.json_response(state.devices)
         if path == "/api/control/initHandshake":
             state.calls.append("handshake")
             return web.json_response({"granted": True})
@@ -570,6 +591,10 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
         method = body["payload"]["content"]["method"]
         state.calls.append(method)
         assert method in ("getMachConfiguration", "getValuesAll")
+        if state.expired:
+            if state.expired_application:
+                return web.json_response({"status": state.expired_status})
+            return web.Response(status=state.expired_status)
         if state.status != 200:
             return web.Response(status=state.status, headers={"Retry-After": "1"})
         if method == "getMachConfiguration":
@@ -588,7 +613,7 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
             state.during_read = None
         return web.json_response({"status": 200, "payload": data})
 
-    url = await loopback(handler)
+    url = (await loopback(handler)).replace("127.0.0.1", "localhost")
     monkeypatch.setattr(portal, "BASE_URL", url)
     monkeypatch.setattr(live, "BASE_URL", url)
     monkeypatch.setattr(live, "REFRESH_DELAY", 0.005)
@@ -1211,3 +1236,114 @@ async def test_location_is_private_paired_and_not_retained(
     set_position(position_snapshot, GPS_LATITUDE=11.125, GPS_LONGITUDE=-21.25)
     recovered = location_from(config, values)
     assert (recovered.latitude, recovered.longitude) == (11.125, -21.25)
+
+
+@pytest.mark.parametrize("status", [401, 403])
+@pytest.mark.parametrize("application", [False, True])
+async def test_expired_session_renews_once_for_concurrent_reads(
+    live_wire, status, application, caplog
+):
+    state = live_wire
+    client = portal.MachClient(persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        assert len(client._session.cookie_jar) == 1
+        old_pump = client.live.pump
+        state.expired, state.expired_status, state.expired_application = True, status, application
+        set_temperature(state, 9)
+        results = await asyncio.gather(*(client.read("synthetic-a") for _ in range(4)))
+        assert all(result.temperature == 9 for result in results)
+        assert state.logins == 2 and state.login_cookies == [False, False]
+        assert old_pump.done() and client.live.pump is not old_pump
+        assert state.calls.count("handshake") == state.calls.count("stream") == 2
+        assert "setValue" not in state.calls
+        assert "synthetic-password" not in caplog.text
+        assert "synthetic-session-" not in caplog.text
+    finally:
+        await client.close()
+    assert client.live.pump is None and client.live.maintenance is None
+
+
+@pytest.mark.parametrize(
+    "failure", [401, 403, 429, 500, "fresh_rejected", "unassigned", "identity"]
+)
+async def test_session_renewal_failure_is_bounded_and_identity_preserved(live_wire, failure):
+    state = live_wire
+    client = portal.MachClient(persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        state.expired = True
+        if isinstance(failure, int):
+            state.login_status = failure
+        elif failure == "fresh_rejected":
+            state.restore_on_login = False
+        elif failure == "unassigned":
+            state.devices = [{"machId": "synthetic-other", "type": "FULL"}]
+        else:
+            state.configuration = {**state.configuration, "machId": "synthetic-other"}
+        terminal = failure in (401, 403, "fresh_rejected", "unassigned")
+        expected = portal.AuthenticationError if terminal else portal.MachError
+        with pytest.raises(expected):
+            await client.read("synthetic-a")
+        before = len(state.calls)
+        with pytest.raises(expected):
+            await client.read("synthetic-a")
+        assert state.logins == 2
+        if failure != "identity":
+            assert len(state.calls) == before
+        assert "setValue" not in state.calls
+        if failure in (429, 500):
+            state.login_status = 200
+            client._renewal_after = 0
+            if failure == 429:
+                # Cooldown and server Retry-After are independent gates.
+                with pytest.raises(portal.MachError):
+                    await client.read("synthetic-a")
+                assert state.logins == 2
+                client._rate_until = 0
+            assert (await client.read("synthetic-a")).temperature == 0
+            assert state.logins == 3
+    finally:
+        await client.close()
+
+
+async def test_live_event_expiry_recovers_and_cancelled_renewal_is_joined(live_wire):
+    state = live_wire
+    connector = aiohttp.TCPConnector()
+    client = portal.MachClient(connector, persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    published = []
+    client.live.listener = published.append
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        state.expired = True
+        set_temperature(state, 8)
+        state.streams[0].put_nowait(value_event(8))
+        await eventually(lambda: published)
+        assert published[-1].temperature == 8 and state.logins == 2
+        await eventually(lambda: client.live.maintenance is None)
+        # Cancellation during a subsequent automatic login leaves no usable partial session.
+        state.expired = True
+        client._renewal_after = 0
+        state.login_entered.clear()
+        state.login_release = asyncio.Event()
+        state.streams[-1].put_nowait(value_event(9))
+        await asyncio.wait_for(state.login_entered.wait(), 2)
+        await asyncio.wait_for(client.close(), 2)
+        assert client.live.pump is None and client.live.maintenance is None
+        assert not connector.closed and state.logins == 3 and len(published) == 1
+    finally:
+        state.login_release.set() if state.login_release else None
+        await client.close()
+        await connector.close()

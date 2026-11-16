@@ -57,6 +57,11 @@ class MachClient:
         self._lock = asyncio.Lock()
         self._rate_until = 0
         self._auth_required = False
+        self._renewal_credentials = None
+        self._renewal_device = None
+        self._renewal_after = 0
+        self._renewal_rejected = False
+        self._closed = False
         self.live = None
         if persistent:
             from .live import LiveConnection
@@ -64,15 +69,25 @@ class MachClient:
             self.live = LiveConnection(self)
 
     async def close(self) -> None:
+        self._closed = True
+        self._renewal_credentials = None
         if self.live:
             await self.live.close()
-        await self._session.close()
+        async with self._lock:
+            await self._session.close()
+
+    def configure_session_renewal(self, device_id, credentials):
+        """Obtain current HA-stored credentials on demand, never persist copies."""
+        self._renewal_device = device_id
+        self._renewal_credentials = credentials
 
     @property
     def rate_wait(self):
         return max(0, self._rate_until - asyncio.get_running_loop().time())
 
     def _network_gate(self):
+        if self._closed:
+            raise MachError("connection_closed")
         if self._auth_required:
             raise AuthenticationError("authentication_rejected")
         if self.rate_wait:
@@ -147,44 +162,85 @@ class MachClient:
         ):
             raise AuthenticationError("authentication_rejected")
         async with self._lock:
-            await self.reset_connection()
-            self._auth_required = False
-            self._devices = ()
-            self._levelling_device = None
-            self._session.cookie_jar.clear()
-            await self._post(
-                "/api/login/login",
-                {"auth": {"username": username, "password": password}},
-                empty=True,
-            )
-            self._devices = assigned_devices(await self._post("/api/user/listMyDevices", {}))
-            return self._devices
+            devices = await self._authenticate_locked(username, password)
+            self._renewal_rejected = False
+            return devices
+
+    async def _authenticate_locked(self, username, password):
+        await self.reset_connection()
+        self._auth_required = False
+        self._devices = ()
+        self._levelling_device = None
+        self._session.cookie_jar.clear()
+        await self._post(
+            "/api/login/login",
+            {"auth": {"username": username, "password": password}},
+            empty=True,
+        )
+        self._devices = assigned_devices(await self._post("/api/user/listMyDevices", {}))
+        return self._devices
+
+    async def _renew_session_locked(self, device_id):
+        if (
+            self._renewal_credentials is None
+            or self._renewal_rejected
+            or device_id != self._renewal_device
+        ):
+            raise AuthenticationError("authentication_rejected")
+        now = asyncio.get_running_loop().time()
+        if now < self._renewal_after or self.rate_wait:
+            raise MachError("session_renewal_deferred")
+        self._renewal_after = now + 60
+        try:
+            username, password = self._renewal_credentials()
+            devices = await self._authenticate_locked(username, password)
+            if device_id not in {device.id for device in devices}:
+                raise AuthenticationError("device_not_assigned")
+        except AuthenticationError:
+            self._renewal_rejected = True
+            self._auth_required = True
+            raise
+        except BaseException:
+            # A partial login/discovery is not a usable session, including cancellation.
+            self._auth_required = True
+            raise
 
     async def read(self, device_id: str) -> Measurement:
-        """One serialized handshake + readiness + configuration/value snapshot."""
+        """Renew expired sessions once, retrying only this complete read."""
         async with self._lock:
-            if device_id not in {device.id for device in self._devices}:
-                raise MachError("device_not_assigned")
-            if self.live is not None:
-                async with self.control_connection(device_id) as stream:
-                    configuration = await self._device_read("getMachConfiguration")
-                    if (
-                        not isinstance(configuration, dict)
-                        or configuration.get("machId") != device_id
-                    ):
-                        raise MachError("vehicle_identity_mismatch")
-                    values = await self._device_read("getValuesAll")
-                    stream.ensure_connected()
-                    return self._observed(configuration, values, device_id)
-            handshake = await self._post("/api/control/initHandshake", {"machId": device_id})
-            if not isinstance(handshake, dict) or handshake.get("granted") is not True:
-                raise MachError("handshake_rejected")
-            async with self._connected_events():
+            if self._renewal_rejected:
+                raise AuthenticationError("authentication_rejected")
+            try:
+                return await self._read_locked(device_id)
+            except AuthenticationError:
+                await self._renew_session_locked(device_id)
+                try:
+                    return await self._read_locked(device_id)
+                except AuthenticationError:
+                    self._renewal_rejected = True
+                    raise
+
+    async def _read_locked(self, device_id):
+        self._network_gate()
+        if device_id not in {device.id for device in self._devices}:
+            raise MachError("device_not_assigned")
+        if self.live is not None:
+            async with self.control_connection(device_id) as stream:
                 configuration = await self._device_read("getMachConfiguration")
                 if not isinstance(configuration, dict) or configuration.get("machId") != device_id:
                     raise MachError("vehicle_identity_mismatch")
                 values = await self._device_read("getValuesAll")
-            return self._observed(configuration, values, device_id)
+                stream.ensure_connected()
+                return self._observed(configuration, values, device_id)
+        handshake = await self._post("/api/control/initHandshake", {"machId": device_id})
+        if not isinstance(handshake, dict) or handshake.get("granted") is not True:
+            raise MachError("handshake_rejected")
+        async with self._connected_events():
+            configuration = await self._device_read("getMachConfiguration")
+            if not isinstance(configuration, dict) or configuration.get("machId") != device_id:
+                raise MachError("vehicle_identity_mismatch")
+            values = await self._device_read("getValuesAll")
+        return self._observed(configuration, values, device_id)
 
     @staticmethod
     def measurement(configuration, values, device_id, identified_equipment=(), levelling=None):

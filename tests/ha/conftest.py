@@ -35,6 +35,10 @@ def backend(monkeypatch, full_snapshot):
             self.closed = False
             state.clients.append(self)
 
+        def configure_session_renewal(self, device_id, credentials):
+            self.renewal_device = device_id
+            self.renewal_credentials = credentials
+
         async def authenticate(self, username, password):
             if state.auth_error:
                 raise state.auth_error

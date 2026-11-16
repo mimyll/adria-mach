@@ -60,6 +60,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: MachConfigEntry) -> bool
             raise ConfigEntryAuthFailed("authentication_rejected") from None
         except MachError:
             raise ConfigEntryNotReady("cannot_connect") from None
+        client.configure_session_renewal(
+            entry.data[CONF_MACH_ID],
+            lambda: (entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD]),
+        )
         coordinator = MachCoordinator(hass, entry, client)
         entry.runtime_data = coordinator
         await coordinator.async_config_entry_first_refresh()

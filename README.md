@@ -15,6 +15,8 @@ Requires **Home Assistant 2026.11.0 or newer** and a MACH account with an assign
 
 Already installed manually? Install through Marketplace and restart. Keep your existing integration entry; do not remove or recreate it, so your entities, settings and command history remain intact.
 
+Expired MACH sessions renew automatically using your stored credentials. If fresh authentication is rejected, Home Assistant asks you to sign in again. Renewal never retries a device command.
+
 ## Updates
 
 New releases appear under **Settings → Updates**. Read the release notes, install the update and restart Home Assistant. Keep GitHub connected in Marketplace for update checks; new releases can take up to 48 hours to appear. See the [Marketplace guide](https://www.home-assistant.io/integrations/marketplace/) for details.

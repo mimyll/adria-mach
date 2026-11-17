@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.15.0
+
+### Added
+
+- Native MACH restart button with fresh assigned-device checks, durable separate request history and no automatic replay. An acknowledgement does not confirm a physical reboot; portal compatibility still awaits an owner-approved device test.
+- Read-only MACH firmware availability and a check button, using observed software version and release channel. Numeric version ordering, isolated HTTP state and independent failure handling keep monitoring available. Firmware installation is not supported.
+- Admin-only local restart acknowledgement requiring the exact current request ID and explicit confirmation. It retains uncertainty history and sends nothing to the vehicle.
+
+### Upgrade and validation
+
+- Requires Home Assistant 2026.11.0 or newer. Update through Marketplace, restart Home Assistant and retain the existing entry. Existing identities, options and legacy command history are preserved.
+- Synthetic protocol, real local HTTP and native HA checks cover isolation, parsing, serialization, persistence and cancellation. No physical reboot was executed during development.
+- Never downgrade to an older integration while restart history is unresolved or its storage is invalid: older versions do not enforce the new restart interlock. Inspect and reconcile the request first.
+
 ## 0.14.1
 
 ### Added

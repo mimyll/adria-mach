@@ -25,6 +25,7 @@ class CommandManager:
         self.cleanup_task = None
         self.closed = False
         self.blocked = False
+        self.restart_unresolved = False
         self.forward_observed = set()
         self.forward_context = {}
         self.status = "idle"
@@ -84,9 +85,12 @@ class CommandManager:
             else None,
             "http_status": self.ack.get("http_status") if self.ack else None,
             "application_status": self.ack.get("application_status") if self.ack else None,
-            "controls_blocked": (self.blocked and not self.can_resynchronize)
+            "controls_blocked": self.restart_unresolved
+            or (self.blocked and not self.can_resynchronize)
             or self.restoration_required,
-            "control_lock_reason": "fresh_manual_resync_required"
+            "control_lock_reason": "restart_unresolved"
+            if self.restart_unresolved
+            else "fresh_manual_resync_required"
             if self.blocked and self.can_resynchronize
             else "uncertain_or_storage"
             if self.blocked
@@ -128,7 +132,8 @@ class CommandManager:
     @property
     def can_resynchronize(self):
         return bool(
-            self.journal
+            not self.restart_unresolved
+            and self.journal
             and (
                 self.journal.resumable_manual
                 or (
@@ -145,10 +150,13 @@ class CommandManager:
         recoverable = self.can_resynchronize
         return {
             **self.attributes,
-            "controls_blocked": self.closed
+            "controls_blocked": self.restart_unresolved
+            or self.closed
             or self.restoration_required
             or (self.blocked and not recoverable),
-            "control_lock_reason": "fresh_light_resync_required"
+            "control_lock_reason": "restart_unresolved"
+            if self.restart_unresolved
+            else "fresh_light_resync_required"
             if recoverable
             else ("uncertain_or_storage" if self.blocked else "none"),
             "previous_command_unknown": recoverable or self.historical_unknown,
@@ -194,10 +202,13 @@ class CommandManager:
             "pending_target": ("on" if pending.target[0] is None else pending.target[0])
             if pending is not None
             else None,
-            "controls_blocked": self.closed
+            "controls_blocked": self.restart_unresolved
+            or self.closed
             or self.restoration_required
             or (self.blocked and not self.can_resynchronize),
-            "control_lock_reason": "uncertain_or_storage"
+            "control_lock_reason": "restart_unresolved"
+            if self.restart_unresolved
+            else "uncertain_or_storage"
             if self.blocked and not self.can_resynchronize
             else "legacy_restoration_required"
             if self.restoration_required
@@ -222,6 +233,8 @@ class CommandManager:
         await self._request(case, target, manual=False)
 
     async def set_manual(self, control, target, *, climate=False, coalesce=False):
+        if self.restart_unresolved:
+            raise self.error("controls_blocked")
         if self.session_test:
             raise self.error("probe_busy")
         if (
@@ -267,6 +280,8 @@ class CommandManager:
     async def _request(
         self, case, target, *, manual, climate=False, unsent_deadline=None, feedback_token=None
     ):
+        if self.restart_unresolved:
+            raise self.error("controls_blocked")
         if self.session_test:
             raise self.error("probe_busy")
         if manual and self.probe_task is not None:

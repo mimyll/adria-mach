@@ -478,6 +478,12 @@
       },
       "all_lights_off": {
         "name": "All lights off"
+      },
+      "restart": {
+        "name": "Restart MACH"
+      },
+      "check_firmware_updates": {
+        "name": "Check firmware updates"
       }
     },
     "scene": {
@@ -488,6 +494,11 @@
     "device_tracker": {
       "location": {
         "name": "Location"
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "MACH firmware"
       }
     }
   },
@@ -524,6 +535,15 @@
     },
     "session_test_failed": {
       "message": "The session-renewal test did not complete. Inspect integration diagnostics. No device command was sent."
+    },
+    "restart_unknown": {
+      "message": "Restart outcome is unknown. Check the device before acknowledging locally. The command will not be replayed."
+    },
+    "restart_acknowledgement_mismatch": {
+      "message": "The acknowledgement does not match the current restart request, or storage is unavailable."
+    },
+    "firmware_check_failed": {
+      "message": "Firmware availability could not be checked."
     }
   },
   "services": {
@@ -548,6 +568,21 @@
         "confirm": {
           "name": "Confirm local session interruption",
           "description": "Confirm discarding the integration's own cookies for this single test."
+        }
+      }
+    },
+    "acknowledge_restart": {
+      "name": "Acknowledge inspected restart request",
+      "description": "Local acknowledgement retains history and sends nothing to the device. Inspect the device first.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration"
+        },
+        "request_id": {
+          "name": "Request ID"
+        },
+        "confirm": {
+          "name": "Confirm"
         }
       }
     }

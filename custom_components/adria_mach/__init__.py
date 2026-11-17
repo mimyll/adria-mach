@@ -68,6 +68,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: MachConfigEntry) -> bool
         entry.runtime_data = coordinator
         await coordinator.async_config_entry_first_refresh()
         await coordinator.commands.setup()
+        await coordinator.maintenance.setup()
+        from .maintenance import FirmwareCoordinator
+
+        coordinator.firmware = FirmwareCoordinator(coordinator, entry)
+        await coordinator.firmware.async_refresh()
         await hass.config_entries.async_forward_entry_setups(
             entry,
             [
@@ -82,6 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MachConfigEntry) -> bool
                 Platform.SELECT,
                 Platform.BUTTON,
                 Platform.SCENE,
+                Platform.UPDATE,
             ],
         )
         entry.async_on_unload(coordinator.async_close)
@@ -113,5 +119,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: MachConfigEntry) -> boo
             Platform.SELECT,
             Platform.BUTTON,
             Platform.SCENE,
+            Platform.UPDATE,
         ],
     )

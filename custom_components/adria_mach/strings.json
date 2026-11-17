@@ -521,6 +521,9 @@
     },
     "equipment_not_enabled": {
       "message": "The optional equipment has not been identified in integration options."
+    },
+    "session_test_failed": {
+      "message": "The session-renewal test did not complete. Inspect integration diagnostics. No device command was sent."
     }
   },
   "services": {
@@ -531,6 +534,20 @@
         "config_entry_id": {
           "name": "Integration",
           "description": "The loaded Adria MACH integration to inspect."
+        }
+      }
+    },
+    "test_session_renewal": {
+      "name": "Test automatic session renewal",
+      "description": "Admin-only: discard this integration's own session cookies and test automatic sign-in with one read cycle, within 90 seconds. Blocks new device commands during the test. Does not invalidate account or other app sessions.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integration",
+          "description": "The loaded Adria MACH integration to test."
+        },
+        "confirm": {
+          "name": "Confirm local session interruption",
+          "description": "Confirm discarding the integration's own cookies for this single test."
         }
       }
     }

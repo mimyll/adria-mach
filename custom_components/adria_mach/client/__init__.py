@@ -62,6 +62,11 @@ class MachClient:
         self._renewal_after = 0
         self._renewal_rejected = False
         self._closed = False
+        self._auth_rejections = 0
+        self._auth_rejection_status = None
+        self._login_attempts = 0
+        self._discoveries = 0
+        self._renewals = 0
         self.live = None
         if persistent:
             from .live import LiveConnection
@@ -99,6 +104,8 @@ class MachClient:
     def _status_gate(self, status, retry_after=""):
         if status in (401, 403):
             self._auth_required = True
+            self._auth_rejections += 1
+            self._auth_rejection_status = status
         if status == 429:
             raw = retry_after
             try:
@@ -172,12 +179,14 @@ class MachClient:
         self._devices = ()
         self._levelling_device = None
         self._session.cookie_jar.clear()
+        self._login_attempts += 1
         await self._post(
             "/api/login/login",
             {"auth": {"username": username, "password": password}},
             empty=True,
         )
         self._devices = assigned_devices(await self._post("/api/user/listMyDevices", {}))
+        self._discoveries += 1
         return self._devices
 
     async def _renew_session_locked(self, device_id):
@@ -196,6 +205,7 @@ class MachClient:
             devices = await self._authenticate_locked(username, password)
             if device_id not in {device.id for device in devices}:
                 raise AuthenticationError("device_not_assigned")
+            self._renewals += 1
         except AuthenticationError:
             self._renewal_rejected = True
             self._auth_required = True
@@ -208,17 +218,65 @@ class MachClient:
     async def read(self, device_id: str) -> Measurement:
         """Renew expired sessions once, retrying only this complete read."""
         async with self._lock:
-            if self._renewal_rejected:
-                raise AuthenticationError("authentication_rejected")
+            return await self._read_with_renewal_locked(device_id)
+
+    async def _read_with_renewal_locked(self, device_id):
+        if self._renewal_rejected:
+            raise AuthenticationError("authentication_rejected")
+        try:
+            return await self._read_locked(device_id)
+        except AuthenticationError:
+            await self._renew_session_locked(device_id)
             try:
                 return await self._read_locked(device_id)
             except AuthenticationError:
-                await self._renew_session_locked(device_id)
-                try:
-                    return await self._read_locked(device_id)
-                except AuthenticationError:
-                    self._renewal_rejected = True
-                    raise
+                self._renewal_rejected = True
+                raise
+
+    async def test_session_renewal(self, device_id, report):
+        """Discard only owned cookies, then exercise the ordinary recovery path."""
+        async with self._lock:
+            self._network_gate()
+            if (
+                self.live is None
+                or self._renewal_credentials is None
+                or self._renewal_rejected
+                or device_id != self._renewal_device
+                or asyncio.get_running_loop().time() < self._renewal_after
+            ):
+                raise MachError("session_test_not_ready")
+            # No automatic login in the baseline: start only from a healthy session.
+            await self._read_locked(device_id)
+            report["baseline_read_completed"] = True
+            before = (
+                self._auth_rejections,
+                self._login_attempts,
+                self._discoveries,
+                self._renewals,
+            )
+            await self.reset_connection()
+            self._session.cookie_jar.clear()
+            report["owned_cookies_cleared"] = True
+            try:
+                measurement = await self._read_with_renewal_locked(device_id)
+            finally:
+                rejections, logins, discoveries, renewals = before
+                rejected = self._auth_rejections > rejections
+                report.update(
+                    authentication_rejection_observed=rejected,
+                    authentication_rejection_status=self._auth_rejection_status
+                    if rejected
+                    else None,
+                    automatic_login_attempts=self._login_attempts - logins,
+                    device_discoveries=self._discoveries - discoveries,
+                    automatic_renewals=self._renewals - renewals,
+                )
+            report.update(
+                configured_vehicle_verified=True,
+                fresh_read_completed=True,
+                received_at=measurement.received_at.isoformat(),
+            )
+            return measurement
 
     async def _read_locked(self, device_id):
         self._network_gate()

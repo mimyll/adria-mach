@@ -52,11 +52,21 @@ class MachCoordinator(DataUpdateCoordinator[Measurement]):
 
         self.commands = CommandManager(hass, self, entry)
         self.last_connection_probe = None
+        self.last_session_renewal_test = None
         if getattr(client, "live", None) is not None:
-            client.live.listener = self.async_set_updated_data
+            client.live.listener = self._live_update
             client.live.error_listener = self._live_error
 
+    def _live_update(self, snapshot):
+        if not self.commands.session_test:
+            self.async_set_updated_data(snapshot)
+
     def _live_error(self, error):
+        if self.commands.session_test:
+            return
+        self._authentication_error(error)
+
+    def _authentication_error(self, error):
         self.async_set_update_error(UpdateFailed("authentication_rejected"))
         if isinstance(error, AuthenticationError):
             self.config_entry.async_start_reauth(self.hass)
@@ -85,6 +95,38 @@ class MachCoordinator(DataUpdateCoordinator[Measurement]):
             await self.commands.close()
         finally:
             await self.client.close()
+
+    async def async_test_session_renewal(self):
+        from .connection_probe import run_session_renewal_test
+
+        commands = self.commands
+        if (
+            commands.closed
+            or commands.task
+            or commands.probe_task
+            or commands.lights.worker
+            or commands.lights.pending
+            or commands.io_jobs
+        ):
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="probe_busy")
+        commands.session_test = True
+        commands.probe_task = asyncio.current_task()
+        try:
+            report = await run_session_renewal_test(self)
+            if report["outcome"] not in ("completed", "not_reproduced"):
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN, translation_key="session_test_failed"
+                )
+            return deepcopy(report)
+        finally:
+            report = self.last_session_renewal_test
+            if report and report["owned_cookies_cleared"]:
+                if report["outcome"] == "authentication_required":
+                    self._authentication_error(AuthenticationError("authentication_rejected"))
+                elif report["outcome"] not in ("completed", "not_reproduced"):
+                    self.async_set_update_error(UpdateFailed("session_test_incomplete"))
+            commands.probe_task = None
+            commands.session_test = False
 
     async def _async_update_data(self) -> Measurement:
         try:

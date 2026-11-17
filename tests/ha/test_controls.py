@@ -1582,3 +1582,136 @@ async def test_ended_newer_light_request_keeps_older_active_display(
     backend.gate.set()
     await first
     assert len(backend.commands) == 1 and not manager.pending_for(ManualControl.GROUP_2)
+
+
+async def test_session_renewal_action_requires_admin_confirmation_and_preserves_history(
+    hass, native_controls, monkeypatch, hass_read_only_user
+):
+    import probatio as vol
+    from homeassistant.core import Context
+
+    entry, backend, light, _ = native_controls
+    coordinator = entry.runtime_data
+    calls = []
+
+    async def diagnostic(device, report):
+        calls.append(device)
+        report.update(
+            baseline_read_completed=True,
+            owned_cookies_cleared=True,
+            authentication_rejection_observed=True,
+            authentication_rejection_status=401,
+            automatic_login_attempts=1,
+            device_discoveries=1,
+            automatic_renewals=1,
+            configured_vehicle_verified=True,
+            fresh_read_completed=True,
+        )
+        return await coordinator.client.read(device)
+
+    monkeypatch.setattr(coordinator.client, "test_session_renewal", diagnostic, raising=False)
+    data = {"config_entry_id": entry.entry_id, "confirm": True}
+    for bad in ({"config_entry_id": entry.entry_id}, {**data, "confirm": False}):
+        with pytest.raises((vol.Invalid, HomeAssistantError)):
+            await hass.services.async_call(
+                DOMAIN, "test_session_renewal", bad, blocking=True, return_response=True
+            )
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            "test_session_renewal",
+            data,
+            blocking=True,
+            return_response=True,
+            context=Context(user_id=hass_read_only_user.id),
+        )
+    assert not calls
+    backend.command_error = ControlError("synthetic_failure")
+    with pytest.raises(HomeAssistantError):
+        await action(hass, "light", "turn_on", light)
+    manager = coordinator.commands
+    history = (manager.directory / "state.json").read_bytes()
+    registry = dict(er.async_get(hass).entities)
+    before = len(backend.commands)
+    result = await hass.services.async_call(
+        DOMAIN, "test_session_renewal", data, blocking=True, return_response=True
+    )
+    assert result["outcome"] == "completed" and calls == ["synthetic-a"]
+    assert manager.blocked and (manager.directory / "state.json").read_bytes() == history
+    assert len(backend.commands) == before and dict(er.async_get(hass).entities) == registry
+    assert manager.probe_task is None and not manager.session_test
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+    assert diagnostics["session_renewal_test"] == result and "synthetic" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("phase", ["baseline", "cookies_cleared", "timeout"])
+async def test_session_renewal_reservation_rejects_controls_and_is_cancelled_on_unload(
+    hass, native_controls, monkeypatch, phase
+):
+    from custom_components.adria_mach import connection_probe
+
+    entry, backend, light, _ = native_controls
+    coordinator = entry.runtime_data
+    manager = coordinator.commands
+    entered = asyncio.Event()
+
+    async def held(device, report):
+        report["owned_cookies_cleared"] = phase != "baseline"
+        entered.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(coordinator.client, "test_session_renewal", held, raising=False)
+    if phase == "timeout":
+        monkeypatch.setattr(connection_probe, "SESSION_TEST_SECONDS", 0.02)
+    data = {"config_entry_id": entry.entry_id, "confirm": True}
+    task = asyncio.create_task(
+        hass.services.async_call(
+            DOMAIN, "test_session_renewal", data, blocking=True, return_response=True
+        )
+    )
+    await asyncio.wait_for(entered.wait(), 2)
+    before = dict(manager.feedback)
+    for request in (
+        action(hass, "light", "turn_on", light),
+        manager.set(Case.LIGHT, "on"),
+        hass.services.async_call(
+            DOMAIN, "test_session_renewal", data, blocking=True, return_response=True
+        ),
+    ):
+        with pytest.raises(HomeAssistantError) as error:
+            await request
+        assert error.value.translation_key == "probe_busy"
+    assert manager.feedback == before and not manager.lights.pending and not backend.commands
+    assert manager.journal.state["pending"] is None
+    if phase == "timeout":
+        with pytest.raises(HomeAssistantError):
+            await task
+        assert coordinator.last_session_renewal_test["outcome"] == "timed_out"
+    else:
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert coordinator.last_session_renewal_test["outcome"] == "cancelled"
+    assert manager.probe_task is None and not manager.session_test
+    assert not backend.commands
+
+
+async def test_session_renewal_refuses_existing_command_queue_or_probe(hass, native_controls):
+    entry, backend, _, _ = native_controls
+    manager = entry.runtime_data.commands
+    data = {"config_entry_id": entry.entry_id, "confirm": True}
+    for owner, attribute, value in (
+        (manager, "task", object()),
+        (manager, "probe_task", object()),
+        (manager.lights, "worker", object()),
+    ):
+        setattr(owner, attribute, value)
+        try:
+            with pytest.raises(HomeAssistantError) as error:
+                await hass.services.async_call(
+                    DOMAIN, "test_session_renewal", data, blocking=True, return_response=True
+                )
+            assert error.value.translation_key == "probe_busy"
+        finally:
+            setattr(owner, attribute, None)
+        assert not manager.session_test and not backend.commands

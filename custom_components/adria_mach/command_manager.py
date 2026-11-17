@@ -21,6 +21,7 @@ class CommandManager:
         self.io_jobs = set()
         self.task = None
         self.probe_task = None
+        self.session_test = False
         self.cleanup_task = None
         self.closed = False
         self.blocked = False
@@ -221,6 +222,8 @@ class CommandManager:
         await self._request(case, target, manual=False)
 
     async def set_manual(self, control, target, *, climate=False, coalesce=False):
+        if self.session_test:
+            raise self.error("probe_busy")
         if (
             isinstance(control, (EquipmentControl, AcControl))
             and control.equipment
@@ -264,6 +267,8 @@ class CommandManager:
     async def _request(
         self, case, target, *, manual, climate=False, unsent_deadline=None, feedback_token=None
     ):
+        if self.session_test:
+            raise self.error("probe_busy")
         if manual and self.probe_task is not None:
             async with asyncio.timeout_at(unsent_deadline):
                 await asyncio.shield(self.probe_task)

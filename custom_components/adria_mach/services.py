@@ -15,6 +15,24 @@ def async_setup_services(hass):
         entry = service.async_get_config_entry(hass, DOMAIN, call.data[ATTR_CONFIG_ENTRY_ID])
         return await entry.runtime_data.async_connection_probe()
 
+    async def test_session_renewal(call):
+        entry = service.async_get_config_entry(hass, DOMAIN, call.data[ATTR_CONFIG_ENTRY_ID])
+        return await entry.runtime_data.async_test_session_renewal()
+
+    service.async_register_admin_service(
+        hass,
+        DOMAIN,
+        "test_session_renewal",
+        test_session_renewal,
+        schema=vol.Schema(
+            {
+                vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+                vol.Required("confirm"): vol.All(bool, vol.In([True])),
+            }
+        ),
+        supports_response=SupportsResponse.ONLY,
+    )
+
     service.async_register_admin_service(
         hass,
         DOMAIN,

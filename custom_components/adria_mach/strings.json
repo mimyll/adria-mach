@@ -171,6 +171,32 @@
       },
       "vehicle_width": {
         "name": "Vehicle width"
+      },
+      "connection_state": {
+        "name": "Connection status",
+        "state": {
+          "unknown": "Unknown",
+          "disconnected": "Disconnected",
+          "connecting": "Connecting",
+          "ready": "Ready",
+          "reconnecting": "Reconnecting",
+          "checking": "Checking",
+          "authentication_required": "Authentication required",
+          "rate_limited": "Rate limited",
+          "closed": "Closed"
+        }
+      },
+      "last_stream_traffic": {
+        "name": "Last event stream traffic"
+      },
+      "last_snapshot_age": {
+        "name": "Last read age"
+      },
+      "reported_device_contact": {
+        "name": "Reported device contact"
+      },
+      "reported_device_contact_age": {
+        "name": "Reported device contact age"
       }
     },
     "binary_sensor": {
@@ -203,6 +229,15 @@
       },
       "roaming_permitted": {
         "name": "Roaming permitted"
+      },
+      "event_stream_connected": {
+        "name": "Event stream connection"
+      },
+      "reported_device_connected": {
+        "name": "Reported vehicle connection"
+      },
+      "reported_cache_initialized": {
+        "name": "Reported cache initialized"
       }
     },
     "light": {

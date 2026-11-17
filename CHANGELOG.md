@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.16.0
+
+### Added
+
+- Connection diagnostics on the existing device: transport status, reported vehicle/cache connection state, last event-stream traffic, last HA read age and optional reported device contact time/age. Missing source metadata remains unknown; HA receipt time is never presented as device sample time.
+- A network-free 30-second age clock that stays visible when telemetry reads fail.
+- An owned watchdog renews and resynchronizes a stream after 10 minutes without incoming bytes, including comment/unchanged-event activity. This conservative inactivity budget is preventative transport renewal, not proof that the vehicle is offline.
+
+### Reliability
+
+- Automatic recovery respects command/probe/session-test and durable-I/O admission, RPC ownership, authentication cooldown and rate limits. It never replays device commands or modifies command history.
+- Old connection metadata is cleared across disconnected generations. Recovery success requires a complete read, and unload joins owned work.
+
+### Upgrade and validation
+
+- Requires Home Assistant 2026.11.0 or newer. Update through Marketplace and restart Home Assistant, retaining the existing entry. All existing entity identities, settings and histories are preserved.
+- Synthetic protocol, real local HTTP/SSE and native HA tests cover silent streams, heartbeat bytes, authentication, cancellation, admission, independent ages and identity/lifecycle behavior. No intentional live fault or physical command was used.
+
 ## 0.15.0
 
 ### Added

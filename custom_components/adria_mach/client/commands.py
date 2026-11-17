@@ -76,13 +76,15 @@ class CommandStream:
                 raise ControlError("stream_disconnected")
         raise ControlError("stream_disconnected")
 
-    async def _events(self, content):
+    async def _events(self, content, *, activity=None):
         pending = bytearray()
         fields = []
         size = 0
         initial_bytes = 0
         ready = False
         async for chunk in content.iter_chunked(4096):
+            if activity is not None:
+                activity()
             initial_bytes += len(chunk)
             if not ready and initial_bytes > MAX_INITIAL_STREAM_BYTES:
                 raise ControlError("stream_failure")

@@ -7,6 +7,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.const import EntityCategory
 
+from .connection_health import ConnectionHealthEntity
 from .entity import MachEntity, async_discover_diagnostics
 
 BINARY_SENSORS = (
@@ -58,6 +59,7 @@ DIAGNOSTIC_BINARY_SENSORS = (
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = entry.runtime_data
+    async_add_entities([MachConnectionBinary(coordinator, d) for d in CONNECTION_BINARY_SENSORS])
     async_add_entities(
         [
             MachBinarySensor(coordinator, description)
@@ -73,4 +75,28 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class MachBinarySensor(MachEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
+        return self.reading
+
+
+CONNECTION_BINARY_SENSORS = (
+    BinarySensorEntityDescription(
+        key="event_stream_connected",
+        translation_key="event_stream_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+    ),
+    BinarySensorEntityDescription(
+        key="reported_device_connected",
+        translation_key="reported_device_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+    ),
+    BinarySensorEntityDescription(
+        key="reported_cache_initialized",
+        translation_key="reported_cache_initialized",
+    ),
+)
+
+
+class MachConnectionBinary(ConnectionHealthEntity, BinarySensorEntity):
+    @property
+    def is_on(self):
         return self.reading

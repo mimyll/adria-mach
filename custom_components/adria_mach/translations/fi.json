@@ -171,6 +171,32 @@
       },
       "vehicle_width": {
         "name": "Vaunun leveys"
+      },
+      "connection_state": {
+        "name": "Yhteyden tila",
+        "state": {
+          "unknown": "Tuntematon",
+          "disconnected": "Katkennut",
+          "connecting": "Yhdistetään",
+          "ready": "Valmis",
+          "reconnecting": "Yhdistetään uudelleen",
+          "checking": "Tarkistetaan",
+          "authentication_required": "Kirjautuminen tarvitaan",
+          "rate_limited": "Pyyntöjä rajoitettu",
+          "closed": "Suljettu"
+        }
+      },
+      "last_stream_traffic": {
+        "name": "Tapahtumayhteyden viimeisin liikenne"
+      },
+      "last_snapshot_age": {
+        "name": "Viimeisimmän luvun ikä"
+      },
+      "reported_device_contact": {
+        "name": "Laitteen ilmoitettu yhteydenotto"
+      },
+      "reported_device_contact_age": {
+        "name": "Laitteen ilmoitetun yhteydenoton ikä"
       }
     },
     "binary_sensor": {
@@ -203,6 +229,15 @@
       },
       "roaming_permitted": {
         "name": "Verkkovierailu sallittu"
+      },
+      "event_stream_connected": {
+        "name": "Tapahtumayhteys"
+      },
+      "reported_device_connected": {
+        "name": "Ajoneuvon ilmoitettu yhteys"
+      },
+      "reported_cache_initialized": {
+        "name": "Ilmoitettu välimuistin valmius"
       }
     },
     "light": {

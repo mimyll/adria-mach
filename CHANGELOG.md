@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.14.1
+
+### Added
+
+- Admin-only, explicitly confirmed session-renewal diagnostic. It discards only the integration's local cookies and performs one bounded monitoring cycle against MACH.
+- A privacy-filtered result showing actual authentication rejection, automatic login/discovery and fresh read completion. A read without rejection is reported as not reproduced.
+
+### Reliability and safety
+
+- Reject new device commands while the diagnostic is active; preserve existing identities, settings and command history.
+- Retain the normal renewal path, rate limits and cooldown. No account-wide logout, credential export or actuator replay is added.
+
+### Upgrade and validation
+
+- Requires Home Assistant 2026.11.0 or newer. Update through Marketplace and restart, keeping the existing integration entry.
+- Automated HTTP-loopback and native HA checks cover recovery, admin access, command exclusion and cancellation. Intentional local cookie loss is distinct from natural server-side expiry; live results are recorded separately.
+
 ## 0.14.0
 
 Automatic recovery from expired MACH cloud sessions, without re-entering valid credentials.

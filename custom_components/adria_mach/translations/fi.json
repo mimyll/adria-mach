@@ -521,6 +521,9 @@
     },
     "equipment_not_enabled": {
       "message": "Lisävarustetta ei ole tunnistettu integraation asetuksissa."
+    },
+    "session_test_failed": {
+      "message": "Istunnon uusintatesti ei valmistunut. Tarkista integraation diagnostiikka. Laitekomentoja ei lähetetty."
     }
   },
   "services": {
@@ -531,6 +534,20 @@
         "config_entry_id": {
           "name": "Integraatio",
           "description": "Testattava Adria MACH -integraatio."
+        }
+      }
+    },
+    "test_session_renewal": {
+      "name": "Testaa istunnon automaattinen uusinta",
+      "description": "Vain ylläpitäjälle: poistaa tämän integraation omat istuntoevästeet ja testaa uudelleenkirjautumisen yhdellä lukukierrolla, enintään 90 sekuntia. Estää uudet laitekomennot testin ajaksi. Ei muuta tilin tai muiden sovellusten istuntoja.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integraatio",
+          "description": "Testattava Adria MACH -integraatio."
+        },
+        "confirm": {
+          "name": "Vahvista istunnon katkaisu",
+          "description": "Hyväksyn integraation omien evästeiden poistamisen tätä yhtä testiä varten."
         }
       }
     }

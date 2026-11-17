@@ -549,6 +549,9 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
         expired_status=401,
         expired_application=False,
         restore_on_login=True,
+        require_cookie=False,
+        cookie_rejection_status=401,
+        cookie_rejection_application=False,
     )
 
     async def handler(request):
@@ -569,6 +572,15 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
             return response
         if path == "/api/user/listMyDevices":
             return web.json_response(state.devices)
+        if (
+            state.require_cookie
+            and path.startswith("/api/control/")
+            and request.cookies.get("session") != "synthetic-session-" + str(state.logins)
+            and (not state.cookie_rejection_application or path == "/api/control/req")
+        ):
+            if state.cookie_rejection_application:
+                return web.json_response({"status": state.cookie_rejection_status})
+            return web.Response(status=state.cookie_rejection_status)
         if path == "/api/control/initHandshake":
             state.calls.append("handshake")
             return web.json_response({"granted": True})
@@ -1347,3 +1359,163 @@ async def test_live_event_expiry_recovers_and_cancelled_renewal_is_joined(live_w
         state.login_release.set() if state.login_release else None
         await client.close()
         await connector.close()
+
+
+@pytest.mark.parametrize("status", [401, 403])
+@pytest.mark.parametrize("application", [False, True])
+async def test_controlled_cookie_loss_uses_real_rejection_and_normal_recovery(
+    live_wire, status, application
+):
+    from custom_components.adria_mach.connection_probe import run_session_renewal_test
+
+    state = live_wire
+    client = portal.MachClient(persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    published, errors = [], []
+    coordinator = SimpleNamespace(
+        client=client,
+        device_id="synthetic-a",
+        async_set_updated_data=published.append,
+        _live_error=errors.append,
+    )
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        state.require_cookie = True
+        state.cookie_rejection_status = status
+        state.cookie_rejection_application = application
+        report = await run_session_renewal_test(coordinator)
+        assert report["outcome"] == "completed" and report["baseline_read_completed"]
+        assert report["owned_cookies_cleared"] and report["authentication_rejection_observed"]
+        assert report["authentication_rejection_status"] == status
+        assert report["automatic_login_attempts"] == report["device_discoveries"] == 1
+        assert report["automatic_renewals"] == 1 and report["configured_vehicle_verified"]
+        assert report["fresh_read_completed"] and len(published) == 1 and not errors
+        assert state.logins == 2 and state.login_cookies == [False, False]
+        assert "setValue" not in state.calls and not report["natural_expiry_tested"]
+        assert "synthetic" not in str(report) and "session-" not in str(report)
+    finally:
+        await client.close()
+    assert client.live.pump is None and client.live.maintenance is None
+
+
+@pytest.mark.parametrize(
+    "mode", ["no_rejection", "cooldown", "baseline_rejected", "login_rejected"]
+)
+async def test_controlled_cookie_loss_never_claims_unobserved_renewal_or_bypasses_gates(
+    live_wire, mode
+):
+    from custom_components.adria_mach.connection_probe import run_session_renewal_test
+
+    state = live_wire
+    client = portal.MachClient(persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    published, errors = [], []
+    coordinator = SimpleNamespace(
+        client=client,
+        device_id="synthetic-a",
+        async_set_updated_data=published.append,
+        _live_error=errors.append,
+    )
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        if mode == "cooldown":
+            client._renewal_after = asyncio.get_running_loop().time() + 60
+        elif mode == "baseline_rejected":
+            state.expired = True
+        elif mode == "login_rejected":
+            state.require_cookie = True
+            state.login_status = 403
+        report = await run_session_renewal_test(coordinator)
+        assert (
+            report["outcome"]
+            == {
+                "no_rejection": "not_reproduced",
+                "cooldown": "failed",
+                "baseline_rejected": "baseline_unavailable",
+                "login_rejected": "authentication_required",
+            }[mode]
+        )
+        assert state.logins == (2 if mode == "login_rejected" else 1)
+        assert len(errors) == (1 if mode == "login_rejected" else 0)
+        assert len(published) == (1 if mode == "no_rejection" else 0)
+        assert report["owned_cookies_cleared"] == (mode in ("no_rejection", "login_rejected"))
+        assert "setValue" not in state.calls
+    finally:
+        await client.close()
+
+
+async def test_controlled_cookie_loss_cancellation_and_lock_deadline_join_owned_work(
+    live_wire, monkeypatch
+):
+    from custom_components.adria_mach import connection_probe
+
+    state = live_wire
+    connector = aiohttp.TCPConnector()
+    client = portal.MachClient(connector, persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    published = []
+    coordinator = SimpleNamespace(
+        client=client,
+        device_id="synthetic-a",
+        async_set_updated_data=published.append,
+        _live_error=lambda error: None,
+    )
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        monkeypatch.setattr(connection_probe, "SESSION_TEST_SECONDS", 0.02)
+        await client._lock.acquire()
+        try:
+            report = await connection_probe.run_session_renewal_test(coordinator)
+        finally:
+            client._lock.release()
+        assert report["outcome"] == "timed_out" and not report["owned_cookies_cleared"]
+        assert state.logins == 1 and not state.calls
+        monkeypatch.setattr(connection_probe, "SESSION_TEST_SECONDS", 90)
+        state.require_cookie = True
+        state.login_entered.clear()
+        state.login_release = asyncio.Event()
+        task = asyncio.create_task(connection_probe.run_session_renewal_test(coordinator))
+        await asyncio.wait_for(state.login_entered.wait(), 2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert coordinator.last_session_renewal_test["outcome"] == "cancelled"
+        assert coordinator.last_session_renewal_test["owned_cookies_cleared"]
+        assert not published and client._auth_required
+        await client.close()
+        assert client.live.pump is None and client.live.maintenance is None
+        assert not connector.closed
+    finally:
+        if state.login_release is not None:
+            state.login_release.set()
+        await client.close()
+        await connector.close()
+
+
+@pytest.mark.parametrize(
+    "code,expected",
+    [
+        ("redirect_rejected", "redirect_rejected"),
+        ("synthetic-private-remote-message", "read_failed"),
+    ],
+)
+async def test_controlled_session_report_exposes_only_allowlisted_failure_codes(code, expected):
+    from custom_components.adria_mach.connection_probe import run_session_renewal_test
+
+    async def failed(device, report):
+        raise portal.MachError(code)
+
+    coordinator = SimpleNamespace(
+        client=SimpleNamespace(test_session_renewal=failed),
+        device_id="synthetic-a",
+        async_set_updated_data=lambda value: None,
+    )
+    report = await run_session_renewal_test(coordinator)
+    assert report["outcome"] == "failed" and report["failure_classification"] == expected
+    assert "synthetic" not in str(report)

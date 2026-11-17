@@ -32,6 +32,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "ack_diagnostics": (coordinator.commands.ack or {}).get("diagnostics")
         or {"classification": "not_recorded"},
         "connection_probe": coordinator.last_connection_probe,
+        "session_renewal_test": coordinator.last_session_renewal_test,
         "live_connection": coordinator.client.live.facts()
         if getattr(coordinator.client, "live", None) is not None
         else None,

@@ -5,3 +5,14 @@ probe_connection:
       selector:
         config_entry:
           integration: adria_mach
+test_session_renewal:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: adria_mach
+    confirm:
+      required: true
+      selector:
+        boolean:

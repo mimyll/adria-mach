@@ -478,6 +478,12 @@
       },
       "all_lights_off": {
         "name": "Sammuta kaikki valot"
+      },
+      "restart": {
+        "name": "Käynnistä MACH uudelleen"
+      },
+      "check_firmware_updates": {
+        "name": "Tarkista laiteohjelmiston päivitykset"
       }
     },
     "scene": {
@@ -488,6 +494,11 @@
     "device_tracker": {
       "location": {
         "name": "Sijainti"
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "MACH-laiteohjelmisto"
       }
     }
   },
@@ -524,6 +535,15 @@
     },
     "session_test_failed": {
       "message": "Istunnon uusintatesti ei valmistunut. Tarkista integraation diagnostiikka. Laitekomentoja ei lähetetty."
+    },
+    "restart_unknown": {
+      "message": "Uudelleenkäynnistyksen tulos on epävarma. Tarkista laite ennen paikallista kuittausta. Komentoa ei lähetetä uudelleen."
+    },
+    "restart_acknowledgement_mismatch": {
+      "message": "Kuittaus ei vastaa nykyistä uudelleenkäynnistyspyyntöä tai tallennus ei ole käytettävissä."
+    },
+    "firmware_check_failed": {
+      "message": "Laiteohjelmiston päivitystietoa ei voitu tarkistaa."
     }
   },
   "services": {
@@ -548,6 +568,21 @@
         "confirm": {
           "name": "Vahvista istunnon katkaisu",
           "description": "Hyväksyn integraation omien evästeiden poistamisen tätä yhtä testiä varten."
+        }
+      }
+    },
+    "acknowledge_restart": {
+      "name": "Kuittaa tarkistettu uudelleenkäynnistyspyyntö",
+      "description": "Paikallinen kuittaus säilyttää historian eikä lähetä laitteelle mitään. Tarkista laitteen tila ensin.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Integraatio"
+        },
+        "request_id": {
+          "name": "Pyynnön tunniste"
+        },
+        "confirm": {
+          "name": "Vahvista"
         }
       }
     }

@@ -11,6 +11,25 @@ from .const import DOMAIN
 
 @callback
 def async_setup_services(hass):
+    async def acknowledge_restart(call):
+        entry = service.async_get_config_entry(hass, DOMAIN, call.data[ATTR_CONFIG_ENTRY_ID])
+        return await entry.runtime_data.maintenance.async_acknowledge(call.data["request_id"])
+
+    service.async_register_admin_service(
+        hass,
+        DOMAIN,
+        "acknowledge_restart",
+        acknowledge_restart,
+        schema=vol.Schema(
+            {
+                vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+                vol.Required("request_id"): vol.Match(r"^[a-f0-9]{32}$"),
+                vol.Required("confirm"): vol.All(bool, vol.In([True])),
+            }
+        ),
+        supports_response=SupportsResponse.ONLY,
+    )
+
     async def probe_connection(call):
         entry = service.async_get_config_entry(hass, DOMAIN, call.data[ATTR_CONFIG_ENTRY_ID])
         return await entry.runtime_data.async_connection_probe()

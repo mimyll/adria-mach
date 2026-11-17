@@ -16,3 +16,19 @@ test_session_renewal:
       required: true
       selector:
         boolean:
+
+acknowledge_restart:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: adria_mach
+    request_id:
+      required: true
+      selector:
+        text:
+    confirm:
+      required: true
+      selector:
+        boolean:

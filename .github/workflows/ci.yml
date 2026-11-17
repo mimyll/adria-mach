@@ -55,7 +55,7 @@ jobs:
       - name: Synthetic protocol, real HTTP loopback and release artifacts
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
-        run: python -m pytest -p pytest_asyncio.plugin tests/test_client.py tests/test_ack_diagnostics.py tests/test_capabilities.py tests/test_release.py -q
+        run: python -m pytest -p pytest_asyncio.plugin tests/test_client.py tests/test_ack_diagnostics.py tests/test_capabilities.py tests/test_maintenance.py tests/test_release.py -q
       - name: Native HA lifecycle, identities and controls (synthetic backend)
         env:
           EXPECTED_HA_VERSION: ${{ matrix.ha }}

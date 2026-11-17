@@ -214,7 +214,10 @@ async def test_native_verified_catalog_metadata_translation_and_shared_availabil
     registry = er.async_get(hass)
     registered = er.async_entries_for_config_entry(registry, entry.entry_id)
     assert {e.unique_id.removeprefix("synthetic-a_") for e in registered} == expected.keys() | {
-        "last_successful_read"
+        "last_successful_read",
+        "restart",
+        "check_firmware_updates",
+        "firmware",
     }
     assert len({e.device_id for e in registered}) == 1 and backend.reads == 1
 
@@ -303,7 +306,7 @@ async def test_upgrade_preserves_existing_living_registration_and_user_settings(
     assert devices.async_get(device.id).area_id == area.id
     assert devices.async_get(device.id).name_by_user == "Owner caravan"
     registered = er.async_entries_for_config_entry(registry, entry.entry_id)
-    assert len(registered) == 19 and {e.device_id for e in registered} == {device.id}
+    assert len(registered) == 22 and {e.device_id for e in registered} == {device.id}
     assert len([e for e in registered if e.unique_id == old.unique_id]) == 1
     assert (hass.states.get(old.entity_id) is None) == (disabled is not None)
 
@@ -315,7 +318,7 @@ async def test_initially_unsupported_optional_field_is_not_created(hass, backend
     await hass.async_block_till_done()
     registry = er.async_get(hass)
     assert registry.async_get_entity_id("binary_sensor", DOMAIN, "synthetic-a_AUX_VALUE") is None
-    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == 18
+    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == 21
     assert temperature_state(hass).state == "0"
 
 

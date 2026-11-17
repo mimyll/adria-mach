@@ -51,6 +51,10 @@ class MachCoordinator(DataUpdateCoordinator[Measurement]):
         from .command_manager import CommandManager
 
         self.commands = CommandManager(hass, self, entry)
+        from .maintenance import Maintenance
+
+        self.maintenance = Maintenance(self)
+        self.firmware = None
         self.last_connection_probe = None
         self.last_session_renewal_test = None
         if getattr(client, "live", None) is not None:
@@ -94,7 +98,11 @@ class MachCoordinator(DataUpdateCoordinator[Measurement]):
         try:
             await self.commands.close()
         finally:
-            await self.client.close()
+            try:
+                if self.firmware is not None:
+                    await self.firmware.async_close()
+            finally:
+                await self.client.close()
 
     async def async_test_session_renewal(self):
         from .connection_probe import run_session_renewal_test

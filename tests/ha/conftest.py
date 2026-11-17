@@ -26,6 +26,24 @@ def backend(monkeypatch, full_snapshot):
     state.control_snapshots = {}
     state.capabilities = None
     state.location = None
+    state.firmware_calls = []
+    state.firmware_error = None
+    state.firmware_latest = "10.0.0"
+
+    from custom_components.adria_mach.client.firmware import (
+        FirmwareClient,
+        FirmwareInfo,
+        version_key,
+    )
+
+    async def check(self, device, installed, channel, language="en"):
+        version_key(installed)
+        state.firmware_calls.append((device, installed, channel))
+        if state.firmware_error:
+            raise state.firmware_error
+        return FirmwareInfo(installed, state.firmware_latest)
+
+    monkeypatch.setattr(FirmwareClient, "check", check)
     from custom_components.adria_mach.client.vehicle import VehicleInfo
 
     state.vehicle = VehicleInfo()

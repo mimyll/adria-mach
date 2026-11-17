@@ -596,7 +596,11 @@ async def live_wire(loopback, monkeypatch, full_snapshot):
                 if event is None:
                     return response
                 try:
-                    await response.write(b"data: " + json.dumps(event).encode() + b"\n\n")
+                    await response.write(
+                        event
+                        if isinstance(event, bytes)
+                        else b"data: " + json.dumps(event).encode() + b"\n\n"
+                    )
                 except ConnectionResetError:
                     return response
         assert path == "/api/control/req"
@@ -1519,3 +1523,223 @@ async def test_controlled_session_report_exposes_only_allowlisted_failure_codes(
     report = await run_session_renewal_test(coordinator)
     assert report["outcome"] == "failed" and report["failure_classification"] == expected
     assert "synthetic" not in str(report)
+
+
+def connection_event(**fields):
+    return {"type": "bcknd-msg", "payload": {"type": "mach-conn", "payload": fields}}
+
+
+@pytest.mark.parametrize("invalid", [None, True, "1790000000000", 1790000000, -1, 10**1000, [], {}])
+def test_connection_metadata_strict_and_no_source_freshness_invention(invalid):
+    from datetime import UTC, datetime
+
+    from custom_components.adria_mach.client.health import ConnectionMetadata
+
+    metadata = ConnectionMetadata()
+    stamp = int(datetime.now(UTC).timestamp() * 1000) - 1000
+    metadata.observe(
+        connection_event(
+            connected=True,
+            initialized=False,
+            lastContactUTC=stamp,
+            vehicleId="SYNTHETIC_PRIVATE_CANARY",
+            location="SYNTHETIC_PRIVATE_CANARY",
+        )
+    )
+    assert metadata.connected is True and metadata.initialized is False
+    assert metadata.last_contact is not None
+    metadata.observe(connection_event(connected=1, initialized="on", lastContactUTC=invalid))
+    assert (
+        metadata.connected is None
+        and metadata.initialized is None
+        and metadata.last_contact is None
+    )
+    assert metadata.facts()["device_sample_at"] is None
+    assert "SYNTHETIC_PRIVATE_CANARY" not in str(metadata.facts())
+    metadata.observe(connection_event(lastContactUTC=stamp + 86400000))
+    assert metadata.last_contact is None
+
+
+async def test_idle_watchdog_renews_silent_socket_once_and_clears_generation_metadata(
+    live_wire,
+    monkeypatch,
+):
+    from custom_components.adria_mach.client import live
+
+    monkeypatch.setattr(live, "STREAM_IDLE_SECONDS", 0.08)
+    monkeypatch.setattr(live, "WATCHDOG_SECONDS", 0.01)
+    client = portal.MachClient(persistent=True)
+    published = []
+    client.live.listener = published.append
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        live_wire.streams[0].put_nowait(connection_event(connected=True, initialized=True))
+        await eventually(lambda: client.live.metadata.initialized is True)
+        await eventually(lambda: client.live.recoveries == 1)
+        assert live_wire.calls.count("handshake") == live_wire.calls.count("stream") == 2
+        assert len(published) == 1
+        assert client.live.metadata.initialized is None
+        assert client.live.facts()["last_recovery_reason"] == "stream_inactive"
+        assert set(live_wire.calls) <= {
+            "handshake",
+            "stream",
+            "getMachConfiguration",
+            "getValuesAll",
+        }
+    finally:
+        await client.close()
+    assert (
+        client.live.watchdog is None and client.live.recovery is None and client.live.pump is None
+    )
+
+
+async def test_comment_and_unchanged_partial_traffic_prevents_idle_renewal(live_wire, monkeypatch):
+    from custom_components.adria_mach.client import live
+
+    monkeypatch.setattr(live, "STREAM_IDLE_SECONDS", 0.08)
+    monkeypatch.setattr(live, "WATCHDOG_SECONDS", 0.01)
+    client = portal.MachClient(persistent=True)
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        count = len(live_wire.calls)
+        for _ in range(6):
+            live_wire.streams[0].put_nowait(b": keep")
+            await asyncio.sleep(0.015)
+            live_wire.streams[0].put_nowait(b"alive\n\n")
+            live_wire.streams[0].put_nowait(value_event(0))
+            await asyncio.sleep(0.015)
+        assert client.live.recovery_attempts == 0 and len(live_wire.calls) == count
+        assert client.live.last_traffic_at is not None
+    finally:
+        await client.close()
+
+
+async def test_watchdog_rechecks_new_traffic_after_rpc_lock_wait(live_wire, monkeypatch):
+    from custom_components.adria_mach.client import live
+
+    monkeypatch.setattr(live, "STREAM_IDLE_SECONDS", 0.08)
+    monkeypatch.setattr(live, "WATCHDOG_SECONDS", 0.01)
+    client = portal.MachClient(persistent=True)
+    held = None
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        live_wire.rpc_release = asyncio.Event()
+        held = asyncio.create_task(client.read("synthetic-a"))
+        await live_wire.rpc_entered.wait()
+        await eventually(lambda: client.live.recovery is not None)
+        live_wire.streams[0].put_nowait(b": alive\n\n")
+        await eventually(lambda: client.live.idle_seconds < 0.02)
+        live_wire.rpc_release.set()
+        await held
+        held = None
+        await eventually(lambda: client.live.recovery is None)
+        assert client.live.recovery_attempts == 0
+        assert live_wire.calls.count("handshake") == 1
+    finally:
+        if held:
+            live_wire.rpc_release.set()
+            await held
+        await client.close()
+
+
+@pytest.mark.parametrize("status", [401, 403, 429])
+async def test_watchdog_respects_session_renewal_and_rate_gate(live_wire, monkeypatch, status):
+    from custom_components.adria_mach.client import live
+
+    monkeypatch.setattr(live, "STREAM_IDLE_SECONDS", 0.08)
+    monkeypatch.setattr(live, "WATCHDOG_SECONDS", 0.01)
+    client = portal.MachClient(persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        if status == 429:
+            live_wire.status = status
+        else:
+            live_wire.expired = True
+            live_wire.expired_status = status
+        await eventually(
+            lambda: client.live.recoveries == 1 if status != 429 else client.rate_wait > 0
+        )
+        if status == 429:
+            before = len(live_wire.calls)
+            await asyncio.sleep(0.12)
+            assert len(live_wire.calls) == before
+            assert live_wire.logins == 1 and client.live.recoveries == 0
+        else:
+            assert live_wire.logins == 2 and client.live.recovery_attempts == 1
+    finally:
+        await client.close()
+
+
+async def test_disconnect_drops_optional_metadata_even_without_another_ensure(live_wire):
+    from datetime import UTC, datetime
+
+    client = portal.MachClient(persistent=True)
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        live_wire.streams[0].put_nowait(
+            connection_event(
+                connected=True,
+                initialized=True,
+                lastContactUTC=int(datetime.now(UTC).timestamp() * 1000) - 1000,
+            )
+        )
+        await eventually(lambda: client.live.metadata.last_contact is not None)
+        await client.reset_connection()
+        assert client.live.metadata.facts()["reported_device_connected"] is None
+        assert (
+            client.live.metadata.initialized is None and client.live.metadata.last_contact is None
+        )
+        live_wire.login_status = 401
+        with pytest.raises(portal.AuthenticationError):
+            await client.authenticate("synthetic-user", "synthetic-password")
+        assert client.live.metadata.connected is None
+    finally:
+        await client.close()
+
+
+async def test_watchdog_rejected_credentials_do_not_create_login_storm(live_wire, monkeypatch):
+    from custom_components.adria_mach.client import live
+
+    monkeypatch.setattr(live, "STREAM_IDLE_SECONDS", 0.05)
+    monkeypatch.setattr(live, "WATCHDOG_SECONDS", 0.01)
+    client = portal.MachClient(persistent=True)
+    client.configure_session_renewal(
+        "synthetic-a", lambda: ("synthetic-user", "synthetic-password")
+    )
+    try:
+        await client.authenticate("synthetic-user", "synthetic-password")
+        await client.read("synthetic-a")
+        live_wire.expired = True
+        live_wire.login_status = 401
+        await eventually(lambda: client._renewal_rejected)
+        before = len(live_wire.calls)
+        await asyncio.sleep(0.1)
+        assert live_wire.logins == 2 and len(live_wire.calls) == before
+        assert client.live.status == "authentication_required"
+    finally:
+        await client.close()
+
+
+async def test_close_during_watchdog_refresh_joins_all_owned_work(live_wire, monkeypatch):
+    from custom_components.adria_mach.client import live
+
+    monkeypatch.setattr(live, "STREAM_IDLE_SECONDS", 0.05)
+    monkeypatch.setattr(live, "WATCHDOG_SECONDS", 0.01)
+    client = portal.MachClient(persistent=True)
+    await client.authenticate("synthetic-user", "synthetic-password")
+    await client.read("synthetic-a")
+    live_wire.rpc_release = asyncio.Event()
+    await asyncio.wait_for(live_wire.rpc_entered.wait(), 2)
+    assert client.live.recovery is not None
+    await asyncio.wait_for(client.close(), 2)
+    live_wire.rpc_release.set()
+    assert client.live.watchdog is None and client.live.recovery is None
+    assert client.live.maintenance is None and client.live.pump is None and client._session.closed

@@ -67,6 +67,7 @@ class MachClient:
         self._login_attempts = 0
         self._discoveries = 0
         self._renewals = 0
+        self.recovery_admission = None
         self.live = None
         if persistent:
             from .live import LiveConnection

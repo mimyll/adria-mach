@@ -12,6 +12,11 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "capabilities": report.export() if report else None,
         "received_at": coordinator.data.received_at.isoformat(),
         "source_sample_at": None,
+        "connection_health": {
+            key: value
+            for key, value in coordinator.health.snapshot().items()
+            if key not in ("last_stream_traffic", "reported_device_contact")
+        },
         "device_diagnostics": {
             key: coordinator.data.values[key]
             for key in sorted(DIAGNOSTIC_KEYS)

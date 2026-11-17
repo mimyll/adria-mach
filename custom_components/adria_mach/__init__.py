@@ -73,6 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MachConfigEntry) -> bool
 
         coordinator.firmware = FirmwareCoordinator(coordinator, entry)
         await coordinator.firmware.async_refresh()
+        await coordinator.health.async_config_entry_first_refresh()
         await hass.config_entries.async_forward_entry_setups(
             entry,
             [

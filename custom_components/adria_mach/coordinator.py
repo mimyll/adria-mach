@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from copy import deepcopy
 from datetime import timedelta
 
@@ -55,15 +56,21 @@ class MachCoordinator(DataUpdateCoordinator[Measurement]):
 
         self.maintenance = Maintenance(self)
         self.firmware = None
+        from .connection_health import ConnectionHealthCoordinator
+
+        self.health = ConnectionHealthCoordinator(self, entry)
+        client.recovery_admission = self._recovery_admission
         self.last_connection_probe = None
         self.last_session_renewal_test = None
         if getattr(client, "live", None) is not None:
             client.live.listener = self._live_update
             client.live.error_listener = self._live_error
+            client.live.state_listener = self.health.changed
 
     def _live_update(self, snapshot):
         if not self.commands.session_test:
             self.async_set_updated_data(snapshot)
+            self.health.changed()
 
     def _live_error(self, error):
         if self.commands.session_test:
@@ -94,11 +101,37 @@ class MachCoordinator(DataUpdateCoordinator[Measurement]):
         finally:
             self.commands.probe_task = None
 
+    @asynccontextmanager
+    async def _recovery_admission(self):
+        commands = self.commands
+        if (
+            commands.closed
+            or commands.task
+            or commands.probe_task
+            or commands.session_test
+            or commands.lights.worker
+            or commands.lights.pending
+            or commands.io_jobs
+        ):
+            yield False
+            return
+        # The watchdog creates a finite task per attempt; manual requests may await this slot.
+        task = asyncio.current_task()
+        commands.probe_task = task
+        try:
+            yield True
+        finally:
+            if commands.probe_task is task:
+                commands.probe_task = None
+
     async def async_close(self):
         try:
             await self.commands.close()
         finally:
             try:
+                if getattr(self.client, "live", None) is not None:
+                    self.client.live.state_listener = None
+                await self.health.async_close()
                 if self.firmware is not None:
                     await self.firmware.async_close()
             finally:

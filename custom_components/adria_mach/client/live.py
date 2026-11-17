@@ -1,13 +1,15 @@
 """Owned HA event connection; value notifications invalidate verified snapshots."""
 
 import asyncio
-from contextlib import suppress
+from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime
 
 import aiohttp
 
 from . import BASE_URL, READINESS_SECONDS, _check_status
 from .catalog import FIELDS
 from .control_model import CONTEXT_KEYS, Case, HeatingControl, ManualControl, WaterControl
+from .health import ConnectionMetadata
 from .master import MasterControl
 from .model import AuthenticationError, MachError
 from .operational import CURRENT_CONTROLS
@@ -17,6 +19,8 @@ from .telemetry import DIAGNOSTIC_FIELDS
 
 REFRESH_DELAY = 0.25
 RECONNECT_DELAYS = (2, 4, 8, 16, 30)
+WATCHDOG_SECONDS = 30
+STREAM_IDLE_SECONDS = 600
 KNOWN_IDS = (
     frozenset(FIELDS)
     | frozenset(DIAGNOSTIC_FIELDS)
@@ -55,6 +59,17 @@ class LiveConnection:
         self.values = {}
         self.listener = None
         self.error_listener = None
+        self.state_listener = None
+        self.metadata = ConnectionMetadata()
+        self.watchdog = None
+        self.recovery = None
+        self.last_traffic_at = None
+        self.last_traffic_monotonic = None
+        self.recovery_attempts = 0
+        self.recoveries = 0
+        self.last_recovery_at = None
+        self.last_recovery_reason = None
+        self.last_error_code = None
 
     def facts(self):
         return {
@@ -66,6 +81,17 @@ class LiveConnection:
             "connection_handshakes": self.handshakes,
             "value_notifications": self.invalidations,
             "event_refreshes": self.refreshes,
+            "last_stream_traffic_at": self.last_traffic_at.isoformat()
+            if self.last_traffic_at
+            else None,
+            "stream_idle_seconds": self.idle_seconds,
+            "stream_inactivity_budget_seconds": STREAM_IDLE_SECONDS,
+            "recovery_attempts": self.recovery_attempts,
+            "successful_recoveries": self.recoveries,
+            "last_recovery_at": self.last_recovery_at,
+            "last_recovery_reason": self.last_recovery_reason,
+            "last_connection_error": self.last_error_code,
+            **self.metadata.facts(),
         }
 
     async def ensure(self, device_id):
@@ -80,6 +106,10 @@ class LiveConnection:
             return
         await self.disconnect()
         self.status = "connecting"
+        self.metadata = ConnectionMetadata()
+        self.last_traffic_at = None
+        self.last_traffic_monotonic = None
+        self._notify()
         result = await self.client._post("/api/control/initHandshake", {"machId": device_id})
         if not isinstance(result, dict) or result.get("granted") is not True:
             raise MachError("handshake_rejected")
@@ -92,6 +122,8 @@ class LiveConnection:
             async with asyncio.timeout(READINESS_SECONDS):
                 await asyncio.wait((self.pump, waiter), return_when=asyncio.FIRST_COMPLETED)
                 self.ensure_connected()
+                if self.watchdog is None:
+                    self.watchdog = asyncio.create_task(self._watchdog())
         except BaseException:
             await self.disconnect()
             raise
@@ -122,13 +154,21 @@ class LiveConnection:
                 if response.content_type != "text/event-stream":
                     raise MachError("invalid_event_stream")
                 parser = CommandStream(self.client)
-                async for event in parser._events(response.content):
+                async for event in parser._events(
+                    response.content, activity=lambda: self._activity(generation)
+                ):
                     if generation != self.generation or self.closed:
                         return
+                    before = self.metadata.facts()
+                    self.metadata.observe(event)
+                    if before != self.metadata.facts():
+                        self._notify()
                     connected = parser._connection(event)
                     if connected is True:
                         self.status = "ready"
                         self.ready.set()
+                        self.last_error_code = None
+                        self._notify()
                     elif connected is False and self.ready.is_set():
                         raise MachError("stream_disconnected")
                     elif self.ready.is_set():
@@ -139,12 +179,16 @@ class LiveConnection:
         except AuthenticationError as error:
             self.error = error
             self.status = "authentication_required"
+            self.last_error_code = "authentication_rejected"
         except Exception:
             self.error = MachError("stream_disconnected")
             self.status = "disconnected"
+            self.last_error_code = "stream_disconnected"
         finally:
             if generation == self.generation:
                 self.ready.clear()
+                self.metadata = ConnectionMetadata()
+                self._notify()
                 if not self.closed:
                     self.dirty.set()
                     self._schedule()
@@ -225,9 +269,91 @@ class LiveConnection:
         finally:
             self.maintenance = None
 
+    @property
+    def idle_seconds(self):
+        if self.last_traffic_monotonic is None:
+            return None
+        return max(0, asyncio.get_running_loop().time() - self.last_traffic_monotonic)
+
+    def _notify(self):
+        if self.state_listener is not None and not self.closed:
+            self.state_listener()
+
+    def _activity(self, generation):
+        if generation == self.generation and not self.closed:
+            self.last_traffic_monotonic = asyncio.get_running_loop().time()
+            self.last_traffic_at = datetime.now(UTC)
+
+    @asynccontextmanager
+    async def _unreserved(self):
+        yield True
+
+    async def _watchdog(self):
+        try:
+            while not self.closed:
+                await asyncio.sleep(WATCHDOG_SECONDS)
+                if (
+                    self.ready.is_set()
+                    and self.idle_seconds is not None
+                    and (self.idle_seconds >= STREAM_IDLE_SECONDS)
+                ):
+                    self.recovery = asyncio.create_task(self._recover_idle(self.generation))
+                    try:
+                        await self.recovery
+                    finally:
+                        self.recovery = None
+        finally:
+            self.watchdog = None
+
+    async def _recover_idle(self, generation):
+        admission = self.client.recovery_admission
+        async with admission() if admission is not None else self._unreserved() as admitted:
+            if not admitted:
+                return
+            attempted = False
+            try:
+                async with asyncio.timeout(30), self.client._lock:
+                    if (
+                        self.closed
+                        or generation != self.generation
+                        or not self.ready.is_set()
+                        or (self.idle_seconds is None or self.idle_seconds < STREAM_IDLE_SECONDS)
+                    ):
+                        return
+                    self.client._network_gate()
+                    attempted = True
+                    self.recovery_attempts = min(1_000_000, self.recovery_attempts + 1)
+                    self.last_recovery_reason = "stream_inactive"
+                    self.last_recovery_at = datetime.now(UTC).isoformat()
+                    self.status = "checking"
+                    self._notify()
+                    await self.disconnect()
+                    measurement = await self.client._read_with_renewal_locked(self.device_id)
+                    self.recoveries = min(1_000_000, self.recoveries + 1)
+                    self.last_error_code = None
+                    if self.listener is not None and not self.closed:
+                        self.listener(measurement)
+            except asyncio.CancelledError:
+                raise
+            except AuthenticationError:
+                self.status = "authentication_required"
+                self.last_error_code = "authentication_rejected"
+                if self.error_listener is not None:
+                    self.error_listener(AuthenticationError("authentication_rejected"))
+            except (MachError, aiohttp.ClientError, TimeoutError):
+                if not attempted and not self.client.rate_wait:
+                    return
+                limited = self.client.rate_wait > 0
+                self.status = "rate_limited" if limited else "disconnected"
+                self.last_error_code = "rate_limited" if limited else "recovery_failed"
+            finally:
+                self._notify()
+
     async def disconnect(self):
         self.generation += 1  # Fence old consumers before closing their response.
+        self.metadata = ConnectionMetadata()
         self.ready.clear()
+        self._notify()
         pump, self.pump = self.pump, None
         if pump is not None:
             pump.cancel()
@@ -236,7 +362,13 @@ class LiveConnection:
     async def close(self):
         self.closed = True
         self.status = "closed"
-        if self.maintenance is not None:
-            self.maintenance.cancel()
-            await asyncio.gather(self.maintenance, return_exceptions=True)
+        tasks = [
+            t
+            for t in (self.maintenance, self.watchdog, self.recovery)
+            if t is not None and t is not asyncio.current_task()
+        ]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self.maintenance = self.watchdog = self.recovery = None
         await self.disconnect()

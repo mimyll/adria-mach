@@ -32,6 +32,8 @@ FILES = (
     "client/journal.py",
     "client/light_queue.py",
     "client/live.py",
+    "client/health.py",
+    "connection_health.py",
     "client/operational.py",
     "client/master.py",
     "command_manager.py",

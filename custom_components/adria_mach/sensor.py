@@ -14,11 +14,13 @@ from homeassistant.const import (
     UnitOfLength,
     UnitOfPressure,
     UnitOfTemperature,
+    UnitOfTime,
 )
 
 from .client.position import ANGLE_KEYS
 from .client.telemetry import POWER_STATES, SIM_STATES
 from .client.vehicle import DIMENSIONS
+from .connection_health import CONNECTION_STATES, ConnectionHealthEntity
 from .const import VALUE_ID
 from .entity import MachEntity, async_discover_diagnostics
 
@@ -191,6 +193,7 @@ VEHICLE_SENSORS = (
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = entry.runtime_data
+    async_add_entities([MachConnectionSensor(coordinator, d) for d in CONNECTION_SENSORS])
     async_add_entities(
         [
             MachSensor(coordinator, description)
@@ -272,3 +275,43 @@ class MachCapabilitySensor(MachEntity, SensorEntity):
     def extra_state_attributes(self):
         report = self.coordinator.data.capabilities
         return {**super().extra_state_attributes, **(report.summary if report else {})}
+
+
+CONNECTION_SENSORS = (
+    SensorEntityDescription(
+        key="connection_state",
+        translation_key="connection_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=CONNECTION_STATES,
+    ),
+    SensorEntityDescription(
+        key="last_stream_traffic",
+        translation_key="last_stream_traffic",
+        device_class=SensorDeviceClass.TIMESTAMP,
+    ),
+    SensorEntityDescription(
+        key="last_snapshot_age",
+        translation_key="last_snapshot_age",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="reported_device_contact",
+        translation_key="reported_device_contact",
+        device_class=SensorDeviceClass.TIMESTAMP,
+    ),
+    SensorEntityDescription(
+        key="reported_device_contact_age",
+        translation_key="reported_device_contact_age",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+)
+
+
+class MachConnectionSensor(ConnectionHealthEntity, SensorEntity):
+    @property
+    def native_value(self):
+        return self.reading

@@ -2,9 +2,33 @@
 
 ## 0.14.0
 
-- Automatically renew expired MACH sessions with the credentials stored in Home Assistant.
-- Request manual reauthentication only when fresh authentication is rejected; temporary outages and rate limits remain recoverable.
-- Limit automatic login attempts, retain the assigned vehicle and never replay device commands during renewal.
+Automatic recovery from expired MACH cloud sessions, without re-entering valid credentials.
+
+### Added
+
+- Automatic session renewal using the credentials already stored in Home Assistant, for both periodic monitoring and event-driven refreshes.
+
+### Fixed
+
+- Monitoring stopping at session expiry and immediately asking for manual sign-in even when the saved username and password are still valid.
+
+### Reliability and safety
+
+- Concurrent monitoring reads share one renewal attempt and a fresh connection.
+- Automatic login attempts are at least 60 seconds apart and respect server rate limits.
+- The configured vehicle is revalidated after login. Rejected authentication, a missing vehicle assignment or another authentication rejection on the renewed session still requires manual reauthentication.
+- Recovery retries only a complete monitoring read. Device commands are never replayed, and uncertain command outcomes and history are preserved.
+
+### Upgrade
+
+- Requires Home Assistant 2026.11.0 or newer. Install through Marketplace and restart Home Assistant.
+- Keep the existing integration entry. Entity and device identities, settings, enabled location tracking and command history are preserved. No new entities or controls are added.
+
+### Validation and known limitations
+
+- Automated protocol/HTTP tests and native integration tests passed on Home Assistant 2026.11.0 and 2026.11.2.
+- Expiry and renewal were tested with a local HTTP/SSE service. The installed integration was verified through fresh monitoring reads after restart.
+- Recovery after natural session expiry on the MACH service still awaits real-world confirmation. No physical device commands were used for validation.
 
 ## 0.13.1
 

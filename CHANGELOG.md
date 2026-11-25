@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.17.0
+
+- Add four optional dashboard cards for overview, heating, lights, and water and energy. Choose the Adria MACH device from the card editor. The overview can display the selected vehicle's GPS position when enabled.
+- Light cards provide ON/OFF, preset brightness for dimmable lights, and editable display names and icons. Shutdown actions use the vehicle's internal master and, when requested, explicit exterior light targets.
+
 ## 0.16.0
 
 ### Added

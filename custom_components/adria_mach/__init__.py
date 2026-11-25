@@ -15,9 +15,11 @@ def CONFIG_SCHEMA(config):
 
 
 async def async_setup(hass, config):
+    from .dashboard import async_setup_dashboard
     from .services import async_setup_services
 
     async_setup_services(hass)
+    await async_setup_dashboard(hass)
     return True
 
 

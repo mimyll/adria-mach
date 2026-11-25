@@ -48,6 +48,8 @@ FILES = (
     "config_flow.py",
     "const.py",
     "coordinator.py",
+    "dashboard.py",
+    "dashboard.js",
     "connection_probe.py",
     "entity.py",
     "manifest.json",

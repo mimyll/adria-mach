@@ -19,6 +19,8 @@ Expired MACH sessions renew automatically using your stored credentials. If fres
 
 ## Updates
 
+After installing 0.17.0 and restarting Home Assistant, use **Edit dashboard → Add card**. Choose one of the **Adria MACH** cards and select the vehicle. The four cards use the current Home Assistant theme. Open **Light names and icons** in the Lights card editor to label each group. Include AUX in the exterior shutdown only if it controls rear lights on your vehicle. GPS in the Overview card is opt-in and requires the enabled Adria GPS entity.
+
 New releases appear under **Settings → Updates**. Read the release notes, install the update and restart Home Assistant. Keep GitHub connected in Marketplace for update checks; new releases can take up to 48 hours to appear. See the [Marketplace guide](https://www.home-assistant.io/integrations/marketplace/) for details.
 
 ## Limitations

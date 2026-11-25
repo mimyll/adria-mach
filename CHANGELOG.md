@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.18.0
+
+- Add an opt-in compact caravan panel with temperature and heating first, a single control for each light, and expandable supplies, location and equipment details.
+- Support a combined lighting control for the selected master and exterior lights. Its off direction uses the configured shutdown script. A mixed reported state selects off.
+- Allow explicit bindings for external battery, gas, spot-price and levelling readings on the caravan panel. Missing measurements are shown independently.
+
 ## 0.17.0
 
 - Add four optional dashboard cards for overview, heating, lights, and water and energy. Choose the Adria MACH device from the card editor. The overview can display the selected vehicle's GPS position when enabled.

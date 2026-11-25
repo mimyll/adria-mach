@@ -21,6 +21,10 @@ Expired MACH sessions renew automatically using your stored credentials. If fres
 
 After installing 0.17.0 and restarting Home Assistant, use **Edit dashboard → Add card**. Choose one of the **Adria MACH** cards and select the vehicle. The four cards use the current Home Assistant theme. Open **Light names and icons** in the Lights card editor to label each group. Include AUX in the exterior shutdown only if it controls rear lights on your vehicle. GPS in the Overview card is opt-in and requires the enabled Adria GPS entity.
 
+The optional `custom:adria-mach-caravan` panel supports the compact layout with `layout_revision: 2`. Set both `device` and `installation_device` to the selected Adria device. The combined lighting control requires an explicitly configured `shutdown_script` for that same vehicle. Set `include_aux` only for a configured rear light, and target the same set of lights in the shutdown script. The combined on command addresses the master and the configured exterior lights in sequence. The master reports its controller state.
+
+The panel accepts optional `battery`, `gas_bottles`, `levelling`, and `spot_price` bindings to existing Home Assistant entities. These sources are selected in the local card configuration. The spot-price row is informational and uses the configured tax multiplier and automation thresholds.
+
 New releases appear under **Settings → Updates**. Read the release notes, install the update and restart Home Assistant. Keep GitHub connected in Marketplace for update checks; new releases can take up to 48 hours to appear. See the [Marketplace guide](https://www.home-assistant.io/integrations/marketplace/) for details.
 
 ## Limitations

@@ -48,6 +48,45 @@ const WORDS = {
   icon: ["Icon", "Kuvake"],
   gps: ["Show GPS map", "Näytä GPS-kartta"],
   includeAux: ["Include configured AUX rear lights", "Sisällytä AUX-takavalot"],
+  on: ["On", "Päällä"],
+  off: ["Off", "Pois"],
+  someOn: ["Some on", "Osa päällä"],
+  tapOff: ["Tap to turn off", "Painallus sammuttaa"],
+  interior: ["Interior lights", "Sisävalot"],
+  allLights: ["Interior and exterior lights", "Sisä- ja ulkovalot"],
+  lightGroups: ["Light groups and rear light", "Valoryhmät ja takavalo"],
+  heatSettings: ["Heating settings", "Lämmitysasetukset"],
+  hotWater: ["Hot water", "Käyttövesi"],
+  price: ["Control price incl. VAT", "Ohjauksen hinta sis. alv"],
+  supplies: ["Caravan status", "Vaunun tiedot"],
+  charge: ["Battery charge", "Akun varaus"],
+  batteryDetails: ["Battery details", "Akun tiedot"],
+  designCapacity: ["Nominal capacity", "Nimelliskapasiteetti"],
+  storedEnergy: ["Stored energy", "Varastoitu energia"],
+  voltage: ["Voltage", "Jännite"],
+  current: ["Current", "Virta"],
+  batteryTemperature: ["Battery temperature", "Akun lämpötila"],
+  runtime: ["Estimated runtime", "Arvioitu käyttöaika"],
+  charging: ["Charging", "Latautuu"],
+  discharging: ["Discharging", "Purkautuu"],
+  idleBattery: ["Not charging", "Ei latausta"],
+  cylinders: ["Gas cylinders", "Kaasupullot"],
+  gasMissing: ["No reading", "Ei mittausta"],
+  calibrate: ["Calibration requested", "Kalibrointia pyydetty"],
+  lowGas: ["Low gas", "Kaasua vähän"],
+  gasError: ["Sensor error", "Anturivirhe"],
+  gasEstimate: ["Estimated empty", "Arvio tyhjenemisestä"],
+  appliances: ["Appliances", "Laitteet"],
+  pump: ["Water pump", "Vesipumppu"],
+  fridgeLevel: ["Cooling level", "Jäähdytystaso"],
+  fridgeAuto: ["Refrigerator automatic mode", "Jääkaapin automatiikka"],
+  dimensions: ["Caravan dimensions", "Vaunun mitat"],
+  length: ["Overall length with drawbar", "Kokonaispituus aisalla"],
+  width: ["Width", "Leveys"],
+  height: ["Height", "Korkeus"],
+  notMeasuring: ["Measurement off", "Mittaus ei käynnissä"],
+  lateral: ["Side-to-side height difference", "Sivusuunnan korkeusero"],
+  longitudinal: ["Front-to-back height difference", "Pituussuunnan korkeusero"],
 };
 
 function finnish(hass) {
@@ -105,6 +144,30 @@ function entityName(hass, id) {
 
 function usable(state, stateless = false) {
   return Boolean(state && state.state !== "unavailable" && (stateless || state.state !== "unknown"));
+}
+
+function measured(state, unit) {
+  if (!usable(state) || !state.state?.trim() || state.attributes.unit_of_measurement !== unit) return null;
+  const value = Number(state.state);
+  return Number.isFinite(value) ? value : null;
+}
+
+function reportedPower(state) {
+  if (!usable(state)) return null;
+  const reported = "reported_state" in state.attributes
+    ? state.attributes.reported_state
+    : state.attributes.request_pending ? null : state.state;
+  return ["on", "off"].includes(reported) ? reported : null;
+}
+
+function readyToControl(state, stateless = false, allowResync = true) {
+  const lock = state?.attributes.control_lock_reason;
+  const resync = allowResync && ["fresh_manual_resync_required", "fresh_light_resync_required"].includes(lock);
+  return usable(state, stateless) && !state.attributes.request_pending
+    && !state.attributes.command_in_progress && !state.attributes.pending_control_requests
+    && state.attributes.controls_blocked !== true
+    && (state.attributes.connection_ready !== false || resync)
+    && (!lock || lock === "none" || resync);
 }
 
 function shutdownSteps(lookup, includeExterior, includeAux) {
@@ -175,6 +238,65 @@ const STYLE = `
   .editor input[type=checkbox] { width:auto; }
 `;
 
+const CARAVAN_STYLE = `
+  .rv { gap:10px; align-items:start; padding:clamp(10px,2.7%,24px); border-radius:18px;
+    background:light-dark(#f5f4f0,#181b1b); color:light-dark(#252b29,#f0f2ee);
+    --rv-dim:light-dark(#59615b,#b9c1ba); --rv-inset:light-dark(#f0f1ed,#2b302e);
+    --rv-idle:light-dark(#747d77,#8d9992); --rv-knob:light-dark(#fff,#18241c);
+    --caravan-line:light-dark(#e0e2dc,#3b4240); --caravan-active:light-dark(#32664c,#95cbaa);
+    --rv-lamp:light-dark(#845519,#e9bb76); --rv-lamp-bg:light-dark(#f7ecd7,#433525);
+    font-variant-numeric:tabular-nums; }
+  .rv ha-card { background:light-dark(#fff,#222626); padding:12px 14px 4px; overflow:visible; }
+  .rv .hint,.rv small { color:var(--rv-dim); font-size:12px; }
+  .rv header h2 { display:flex; align-items:center; gap:9px; font-size:26px; }
+  .rv header ha-icon { --mdc-icon-size:24px; color:var(--rv-dim); }
+  .rv header p { display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin:4px 0 0; }
+  .rv-dot { width:7px; height:7px; border-radius:50%; background:var(--rv-idle); }
+  .rv-dot.ok { background:var(--caravan-active); }
+  .rv .temps { align-items:end; padding:4px 0 12px; border-bottom:1px solid var(--caravan-line); }
+  .rv .temps .label { color:var(--rv-dim); font-size:12px; }
+  .rv .hero { font-size:clamp(30px,5vw,42px); letter-spacing:-.04em; }
+  .rv .temps>div+div .hero { font-size:28px; }
+  .rv .row { padding:0; box-sizing:border-box; }
+  .rv .label { gap:8px; }
+  .rv .controls { flex-wrap:nowrap; }
+  .rv h3 { margin:4px 0 6px; }
+  .rv details { border-top:1px solid var(--caravan-line); }
+  .rv details .tiles { padding-bottom:8px; }
+  .rv summary { display:flex; align-items:center; justify-content:space-between; gap:6px;
+    list-style:none; font-size:13px; }
+  .rv summary::-webkit-details-marker { display:none; }
+  .rv summary span:first-child { flex:1; }
+  .rv summary::after { content:""; width:6px; height:6px; margin:0 3px 3px;
+    border:solid var(--rv-dim); border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
+  .rv details[open]>summary::after { transform:rotate(225deg); margin-bottom:-3px; }
+  .rv :is(button,select,summary,a):focus-visible { outline:2px solid var(--caravan-active); outline-offset:2px; }
+  .rv .rv-switch { display:inline-flex; align-items:center; justify-content:flex-end; gap:7px; flex:none;
+    min-width:72px; padding:0; background:transparent; border:0; }
+  .rv .rv-switch b { position:relative; width:34px; height:20px; border-radius:14px; background:var(--rv-idle); }
+  .rv .rv-switch b::after { content:""; position:absolute; width:14px; height:14px; left:3px; top:3px;
+    border-radius:50%; background:var(--rv-knob); }
+  .rv .rv-switch[aria-checked=true] b { background:var(--caravan-active); }
+  .rv .rv-switch[aria-checked=true] b::after { left:17px; }
+  .rv .rv-switch[aria-checked=mixed] b::after { left:10px; top:8px; height:4px; border-radius:3px; }
+  .rv .rv-lamp { display:inline-grid; place-items:center; flex:none; width:27px; height:27px;
+    border-radius:8px; background:var(--rv-inset); color:var(--rv-dim); }
+  .rv .row[data-on=true] .rv-lamp { background:var(--rv-lamp-bg); color:var(--rv-lamp); }
+  .rv .rv-level { border:0; max-width:74px; padding:0; background:none; color:var(--rv-dim); font-size:12px; }
+  .rv .status { flex-basis:100%; }
+  .rv .rv-step button { width:44px; background:none; border:0; font-size:20px; }
+  .rv .rv-step strong { min-width:45px; text-align:center; }
+  .rv p { margin:0 0 8px; }
+  .rv .rv-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(124px,100%),1fr));
+    gap:8px 12px; padding:5px 0 12px; }
+  .rv .rv-metrics strong,.rv .rv-metrics small { display:block; overflow-wrap:anywhere; }
+  .rv .rv-bottles { border-top:1px solid var(--caravan-line); padding-top:9px; }
+  .rv .rv-bottles .rv-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .rv .rv-bottles h4 { margin:0; }
+  .rv [hidden] { display:none!important; }
+  @media (max-width:380px) { .rv ha-card { padding-inline:9px; } .rv .label,.rv .controls { gap:4px; } }
+`;
+
 class AdriaCard extends HTMLElement {
   static getStubConfig(hass) {
     const ids = deviceIds(hass);
@@ -236,14 +358,18 @@ class AdriaCard extends HTMLElement {
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: "open" });
     this.bindings = [];
     const privateView = this.constructor.kind === "caravan";
+    const revised = privateView && this.config.layout_revision === 2;
     const layout = element("div", undefined, { className: privateView ? "layout caravan" : "layout" });
-    shadow.replaceChildren(element("style", STYLE), layout);
+    if (revised) layout.classList.add("rv");
+    shadow.replaceChildren(element("style", revised ? STYLE + CARAVAN_STYLE : STYLE), layout);
     if (!this.entityScope.device || !this.entityScope.matches.size ||
         (privateView && this.config.installation_device !== this.entityScope.device)) {
       this.section(layout).append(element("div", this.t("choose")));
       return;
     }
-    if (privateView) {
+    if (revised) {
+      this.caravan(layout);
+    } else if (privateView) {
       layout.append(element("h2", this.config.title ?? "Vaunu", { className: "wide" }));
       this.overview(layout, true);
       this.heating(layout, true);
@@ -513,6 +639,494 @@ class AdriaCard extends HTMLElement {
       this.sending = false;
       this.refresh();
     }
+  }
+
+  caravan(layout) {
+    const header = element("header", undefined, { className: "wide" });
+    const title = element("h2");
+    title.append(icon("mdi:caravan"), this.config.title ?? "Vaunu");
+    const line = element("p", undefined, { className: "hint" });
+    const dot = element("span", undefined, { className: "rv-dot" });
+    const connection = element("span");
+    line.append(dot, connection);
+    header.append(title, line);
+    layout.append(header);
+    this.bindings.push(() => {
+      const state = this.home.states[this.id("sensor", "connection_state")];
+      const age = this.home.states[this.id("sensor", "last_snapshot_age")];
+      dot.classList.toggle("ok", state?.state === "ready");
+      connection.textContent = [this.t("linked"), this.display(state), this.t("age"), this.display(age)].join(" · ");
+    });
+
+    this.caravanHeating(layout);
+    this.caravanLights(layout);
+    this.caravanSupplies(layout);
+  }
+
+  display(state) {
+    return usable(state) ? this.home.formatEntityState(state) : "—";
+  }
+
+  number(value, digits = 2) {
+    return new Intl.NumberFormat(this.language ? "fi" : "en", { maximumFractionDigits: digits }).format(value);
+  }
+
+  disclosure(parent, title) {
+    const details = element("details");
+    const summary = element("summary");
+    summary.append(element("span", title));
+    details.append(summary);
+    parent.append(details);
+    return details;
+  }
+
+  powerControl(name, role = "switch") {
+    const control = element("button", undefined, { type: "button", className: "rv-switch" });
+    control.setAttribute("role", role);
+    control.setAttribute("aria-label", name);
+    const thumb = element("b");
+    thumb.setAttribute("aria-hidden", "true");
+    control.append(element("span", "—", { className: "hint" }), thumb);
+    return control;
+  }
+
+  paintPower(button, state, disabled, pending) {
+    button.setAttribute("aria-checked", state === "mixed" ? "mixed" : String(state === "on"));
+    button.disabled = disabled;
+    button.firstElementChild.textContent = pending ? this.t("pending") :
+      state === "mixed" ? this.t("someOn") :
+      state ? this.t(state) : this.t("unavailable");
+  }
+
+  caravanPowerRow(parent, id, name, { symbol, dimmer = false, climate = false, heading = false } = {}) {
+    if (!id) return;
+    const domain = id.split(".")[0];
+    const state = () => this.home.states[id];
+    const observed = () => climate
+      ? ({ heat: "on", off: "off" })[state()?.state] ?? null
+      : reportedPower(state());
+    const row = element("div", undefined, { className: "row" });
+    const title = element(heading ? "h3" : "span", undefined, { className: "label" });
+    if (symbol) {
+      const lamp = element("span", undefined, { className: heading ? "" : "rv-lamp" });
+      lamp.append(icon(symbol));
+      title.append(lamp);
+    }
+    title.append(name);
+    const power = this.powerControl(name);
+    const controls = element("div", undefined, { className: "controls" });
+    const feedback = element("span", undefined, { className: "hint status" });
+    feedback.setAttribute("role", "status");
+    this.bindings.push(() => {
+      const pending = Boolean(state()?.attributes.request_pending);
+      const value = observed();
+      row.dataset.on = String(value === "on");
+      this.paintPower(power, value, !value || this.sending || !readyToControl(state()), pending);
+    });
+    if (dimmer) {
+      const brightness = element("select", undefined, { className: "rv-level" });
+      brightness.setAttribute("aria-label", `${name}, ${this.t("brightness")}`);
+      const current = new Option(this.t("brightness"), "");
+      current.disabled = true;
+      brightness.add(current);
+      for (const preset of PRESETS) brightness.add(new Option(`${preset} %`, String(preset)));
+      controls.append(brightness);
+      this.bindings.push(() => {
+        const attrs = state()?.attributes ?? {};
+        brightness.hidden = !attrs.supported_color_modes?.includes("brightness");
+        brightness.disabled = power.disabled;
+        if (this.shadowRoot.activeElement === brightness && !brightness.disabled) return;
+        const raw = attrs.reported_brightness ?? (attrs.request_pending ? null : attrs.brightness);
+        const percent = observed() === "on" && Number.isFinite(raw) ? Math.round(raw * 100 / 255) : null;
+        current.textContent = percent === null ? this.t("brightness") : `${percent} %`;
+        brightness.value = PRESETS.includes(percent) ? String(percent) : "";
+      });
+      brightness.addEventListener("change", () => {
+        const level = Number(brightness.value);
+        if (!brightness.hidden && !power.disabled && PRESETS.includes(level)) {
+          this.send("light", "turn_on", id, { brightness_pct: level }, feedback);
+        }
+      });
+    }
+    controls.append(power);
+    row.append(title, controls, feedback);
+    parent.append(row);
+    power.addEventListener("click", () => {
+      if (!power.disabled && readyToControl(state())) {
+        this.send(domain, observed() === "on" ? "turn_off" : "turn_on", id, {}, feedback);
+      }
+    });
+  }
+
+  caravanHeating(parent) {
+    const card = this.section(parent);
+    const temperatures = element("div", undefined, { className: "temps" });
+    this.addReading(temperatures, this.id("sensor", "living_temperature"), "inside", null, true);
+    this.addReading(temperatures, this.id("sensor", "outside_temperature"), "outside", null, true);
+    card.append(temperatures);
+    const climate = this.id("climate", "heating_climate");
+    this.caravanPowerRow(card, climate, label(this.home, PICKER.heating), {
+      symbol: "mdi:thermometer", climate: true, heading: true,
+    });
+    if (climate) this.caravanTarget(card, climate);
+    const details = this.disclosure(card, this.t("heatSettings"));
+    const spot = this.config.spot_control;
+    if (/^input_boolean\.[a-z0-9_]+$/.test(spot ?? "")) {
+      const summaryState = element("small");
+      details.firstElementChild.append(summaryState);
+      this.bindings.push(() => {
+        summaryState.textContent = this.home.states[spot]?.state === "on"
+          ? label(this.home, ["Spot control on", "Pörssisähkö päällä"])
+          : this.home.states[spot]?.state === "off"
+            ? label(this.home, ["Spot control off", "Pörssisähkö pois"]) : "";
+      });
+      this.caravanPowerRow(details, spot, this.t("spot"));
+      this.caravanPrice(details);
+    }
+    const tiles = element("div", undefined, { className: "tiles" });
+    details.append(tiles);
+    this.tile(tiles, this.id("select", "heating_source"), {
+      name: this.t("source"), features: [{ type: "select-options" }],
+    });
+    this.tile(tiles, this.id("select", "heating_priority"), {
+      name: this.t("priority"), features: [{ type: "select-options" }],
+    });
+    this.tile(tiles, this.id("water_heater", "water_heater_control"), {
+      name: this.t("hotWater"), features: [{ type: "water-heater-operation-modes" }],
+    });
+  }
+
+  caravanTarget(parent, id) {
+    const row = element("div", undefined, { className: "row" });
+    const controls = element("div", undefined, { className: "controls rv-step" });
+    const lower = element("button", "−", { type: "button" });
+    const upper = element("button", "+", { type: "button" });
+    lower.setAttribute("aria-label", label(this.home, ["Lower target", "Laske tavoitetta"]));
+    upper.setAttribute("aria-label", label(this.home, ["Raise target", "Nosta tavoitetta"]));
+    const value = element("strong", "—");
+    const feedback = element("span", undefined, { className: "hint status" });
+    feedback.setAttribute("role", "status");
+    controls.append(lower, value, upper);
+    row.append(element("span", this.t("target"), { className: "hint" }), controls, feedback);
+    parent.append(row);
+    const next = (direction) => {
+      const state = this.home.states[id];
+      const attrs = state?.attributes ?? {};
+      if (!Number.isFinite(attrs.temperature)) return null;
+      const target = attrs.temperature + direction * (attrs.target_temp_step ?? 1);
+      return Number.isFinite(target) && target >= attrs.min_temp && target <= attrs.max_temp ? target : null;
+    };
+    const allowed = () => !this.sending && this.home.states[id]?.state === "heat"
+      && this.home.states[this.id("binary_sensor", "mains_supply")]?.state === "on"
+      && readyToControl(this.home.states[id]);
+    for (const [button, direction] of [[lower, -1], [upper, 1]]) {
+      button.addEventListener("click", () => {
+        const temperature = next(direction);
+        if (!button.disabled && allowed() && temperature !== null) {
+          this.send("climate", "set_temperature", id, { temperature }, feedback);
+        }
+      });
+      this.bindings.push(() => { button.disabled = !allowed() || next(direction) === null; });
+    }
+    this.bindings.push(() => {
+      const state = this.home.states[id];
+      const temperature = state?.attributes.temperature;
+      value.textContent = usable(state) && Number.isFinite(temperature)
+        ? `${this.number(temperature)} ${this.home.config?.unit_system?.temperature ?? "°C"}` : "—";
+    });
+  }
+
+  caravanLights(parent) {
+    const card = this.section(parent, label(this.home, PICKER.lights), "mdi:lightbulb-outline");
+    const includeRear = this.config.include_aux === true;
+    const light = (container, key, domain = "light") => {
+      const id = this.id(domain, key);
+      if (!id) return;
+      const alias = this.config.light_labels?.[key];
+      const name = alias?.name?.trim() || (key === "light_master" ? this.t("interior") : entityName(this.home, id));
+      const symbol = alias?.icon || this.home.entities[id]?.icon
+        || (key === "outside_light" ? "mdi:outdoor-lamp" : "mdi:lightbulb-outline");
+      this.caravanPowerRow(container, id, name, { symbol, dimmer: domain === "light" });
+    };
+    light(card, "light_master");
+    this.caravanCombined(card);
+    light(card, "outside_light");
+    if (LIGHT_KEYS.some(key => this.id("light", key)) || (includeRear && this.id("switch", "aux_output"))) {
+      const details = this.disclosure(card, includeRear ? this.t("lightGroups") : this.t("groups"));
+      for (const key of LIGHT_KEYS) light(details, key);
+      if (includeRear) light(details, "aux_output", "switch");
+    }
+  }
+
+  caravanCombined(parent) {
+    const name = this.t("allLights");
+    const control = this.powerControl(name, "checkbox");
+    const scope = element("span", name);
+    const action = element("small");
+    control.setAttribute("aria-describedby", "rv-combined-action");
+    action.id = "rv-combined-action";
+    action.style.display = "block";
+    scope.append(action);
+    const lamp = element("span", undefined, { className: "rv-lamp" });
+    lamp.append(icon("mdi:lightbulb-group-outline"));
+    const title = element("span", undefined, { className: "label" });
+    title.append(lamp, scope);
+    const row = element("div", undefined, { className: "row" });
+    const feedback = element("span", undefined, { className: "hint status" });
+    feedback.setAttribute("role", "status");
+    row.append(title, control, feedback);
+    parent.append(row);
+
+    const members = [
+      ["light", this.id("light", "light_master")],
+      ["light", this.id("light", "outside_light")],
+    ];
+    const includeRear = this.config.include_aux === true;
+    if (includeRear) members.push(["switch", this.id("switch", "aux_output")]);
+    const offButton = this.id("button", "all_lights_off");
+    const script = this.config.shutdown_script;
+    const device = this.entityScope.device;
+    const config = this.config;
+    const sameScope = () => this.config === config && this.entityScope.device === device &&
+      this.shadowRoot.contains(row);
+    const observed = () => {
+      const states = members.map(([,id]) => reportedPower(this.home.states[id]));
+      if (states.includes(null)) return null;
+      return states.every(state => state === states[0]) ? states[0] : "mixed";
+    };
+    const ready = (allowResync = true) => sameScope()
+      && /^script\.[a-z0-9_]+$/.test(script ?? "")
+      && this.home.states[script]?.state === "off"
+      && readyToControl(this.home.states[offButton], true, allowResync)
+      && members.every(([,id]) => readyToControl(this.home.states[id], false, allowResync));
+    this.bindings.push(() => {
+      const state = observed();
+      const pending = members.some(([,id]) => this.home.states[id]?.attributes.request_pending)
+        || this.home.states[script]?.state === "on";
+      this.paintPower(control, state, !state || this.sending || !ready(), pending);
+      row.dataset.on = String(state === "on");
+      action.textContent = state === "mixed" ? this.t("tapOff") : "";
+    });
+    control.addEventListener("click", async () => {
+      const state = observed();
+      if (control.disabled || this.sending || !state || !ready()) return;
+      if (state !== "off") {
+        // Keep the installed script as the single owner of combined shutdown.
+        await this.shutdown(shutdownSteps((domain, key) => this.id(domain, key), true, includeRear),
+          true, true, feedback);
+        return;
+      }
+      this.sending = true;
+      feedback.textContent = this.t("pending");
+      this.refresh();
+      let attempted = false;
+      try {
+        for (const [domain, id] of members) {
+          if (!ready(!attempted) || !reportedPower(this.home.states[id])) throw new Error("unavailable");
+          attempted = true;
+          await this.home.callService(domain, "turn_on", {}, { entity_id: id });
+          const reported = await this.home.callApi("GET", `states/${id}`);
+          if (reportedPower(reported) !== "on") throw new Error("unconfirmed");
+        }
+        feedback.textContent = this.t("done");
+      } catch {
+        feedback.textContent = attempted
+          ? label(this.home, ["Lighting operation interrupted. Check the reported lights.",
+            "Valojen ohjaus keskeytyi. Tarkista valojen ilmoitettu tila."])
+          : this.t("failed");
+      } finally {
+        this.sending = false;
+        this.refresh();
+      }
+    });
+  }
+
+  caravanPrice(parent) {
+    const config = this.config.spot_price;
+    if (!config || !Number.isFinite(config.tax_multiplier) || config.tax_multiplier <= 0) return;
+    const cents = (price) => this.number(price * 100 * config.tax_multiplier);
+    const row = element("div", undefined, { className: "row" });
+    const price = element("strong", "—");
+    row.append(element("span", this.t("price")), price);
+    parent.append(row);
+    this.bindings.push(() => {
+      const current = measured(this.external(config.entity, "sensor"), "EUR/kWh");
+      price.textContent = current === null ? "—" : `${cents(current)} ${this.language ? "snt" : "¢"}/kWh`;
+    });
+    if (![config.below, config.above, config.warm_target, config.cool_target].every(Number.isFinite)
+      || config.below >= config.above) return;
+    const low = cents(config.below);
+    const high = cents(config.above);
+    const warm = this.number(config.warm_target);
+    const cool = this.number(config.cool_target);
+    parent.append(element("p", label(this.home, [
+      `At home on shore power, with heating and spot control on and the connection ready, the rule requests ${warm} °C below ${low} ¢/kWh and ${cool} °C above ${high} ¢/kWh. Between these prices it holds the current target.`,
+      `Kotona verkkovirrassa sekä lämmityksen ja pörssiohjauksen ollessa päällä ohjaus pyytää ${warm} °C alle ${low} snt/kWh hinnalla ja ${cool} °C yli ${high} snt/kWh hinnalla, kun yhteys on valmis. Välillä ${low}–${high} snt/kWh tavoite säilyy.`,
+    ]), { className: "hint" }));
+  }
+
+  external(id, domain) {
+    return typeof id === "string" && id.startsWith(`${domain}.`) ? this.home.states[id] : undefined;
+  }
+
+  metric(parent, title, display) {
+    const item = element("div");
+    const value = element("strong", "—");
+    item.append(element("small", title), value);
+    parent.append(item);
+    this.bindings.push(() => { value.textContent = display() ?? "—"; });
+    return item;
+  }
+
+  caravanSupplies(parent) {
+    const card = this.section(parent, this.t("supplies"), "mdi:power-plug-outline", true);
+    const summary = element("div", undefined, { className: "rv-metrics" });
+    card.append(summary);
+    const read = (domain, key) => this.home.states[this.id(domain, key)];
+    this.metric(summary, this.t("mains"), () => {
+      const state = read("binary_sensor", "mains_supply")?.state;
+      if (state === "on") return label(this.home, ["230 V connected", "230 V kytketty"]);
+      if (state === "off") return label(this.home, ["Disconnected", "Irti"]);
+      return null;
+    });
+    const battery = this.config.battery ?? {};
+    const bms = key => this.external(battery[key], "sensor");
+    if (battery.charge) {
+      const item = this.metric(summary, this.t("charge"), () => this.display(bms("charge")));
+      const detail = element("small");
+      item.append(detail);
+      this.bindings.push(() => {
+        const power = measured(bms("power"), "W");
+        const charging = this.external(battery.charging, "binary_sensor")?.state;
+        const direction = power > 0 && charging === "on" ? "charging"
+          : power < 0 && charging === "off" ? "discharging"
+            : power === 0 && charging === "off" ? "idleBattery" : null;
+        detail.textContent = power === null ? "" :
+          [`${this.number(direction ? Math.abs(power) : power, 1)} W`, direction && this.t(direction)].filter(Boolean).join(" · ");
+      });
+    } else {
+      this.metric(summary, this.t("battery"), () => this.display(read("sensor", "battery_voltage")));
+    }
+    this.metric(summary, this.t("fresh"), () => this.display(read("sensor", "fresh_water_level")));
+    this.metric(summary, this.t("waste"), () => this.display(read("sensor", "waste_water_level")));
+    this.caravanGas(card);
+    if (battery.charge) this.caravanBattery(card, bms, battery.charging);
+
+    const devices = this.disclosure(card, this.t("appliances"));
+    devices.firstElementChild.append(element("small", `${this.t("fridge")}, ${this.t("pump").toLowerCase()}`));
+    this.caravanPowerRow(devices, this.id("switch", "fridge_power"), this.t("fridge"));
+    this.tile(devices, this.id("select", "fridge_source"), {
+      name: this.t("source"), features: [{ type: "select-options" }],
+    });
+    this.tile(devices, this.id("select", "fridge_level"), {
+      name: this.t("fridgeLevel"), features: [{ type: "select-options" }],
+    });
+    this.caravanPowerRow(devices, this.id("switch", "fridge_auto"), this.t("fridgeAuto"));
+    this.caravanPowerRow(devices, this.id("switch", "water_pump"), this.t("pump"));
+    if (this.config.show_map) this.location(card);
+    this.caravanLevelling(card);
+    const dimensions = [
+      ["length", "vehicle_length_with_towbar"], ["width", "vehicle_width"], ["height", "vehicle_height"],
+    ].filter(([,key]) => this.id("sensor", key));
+    if (dimensions.length) {
+      const details = this.disclosure(card, this.t("dimensions"));
+      const grid = element("div", undefined, { className: "rv-metrics" });
+      details.append(grid);
+      for (const [labelKey, key] of dimensions) {
+        this.metric(grid, this.t(labelKey), () => {
+          const value = measured(read("sensor", key), "mm");
+          return value === null ? null : `${this.number(value / 1000, 3)} m`;
+        });
+      }
+    }
+  }
+
+  caravanBattery(parent, bms, chargingId) {
+    const details = this.disclosure(parent, this.t("batteryDetails"));
+    details.firstElementChild.append(element("small", "Bluetooth BMS"));
+    const grid = element("div", undefined, { className: "rv-metrics" });
+    details.append(grid);
+    for (const [key, title] of [
+      ["capacity", "designCapacity"], ["voltage", "voltage"], ["current", "current"],
+      ["temperature", "batteryTemperature"],
+    ]) this.metric(grid, this.t(title), () => this.display(bms(key)));
+    this.metric(grid, this.t("storedEnergy"), () => {
+      const value = measured(bms("energy"), "Wh");
+      return value === null ? this.display(bms("energy")) : `${this.number(value / 1000)} kWh`;
+    });
+    const runtime = () => {
+      const power = measured(bms("power"), "W");
+      const state = bms("runtime");
+      const unit = state?.attributes.unit_of_measurement;
+      const duration = ["s", "min", "h", "d"].includes(unit) ? measured(state, unit) : null;
+      const discharging = power !== null && power < 0
+        && this.external(chargingId, "binary_sensor")?.state === "off";
+      return discharging && duration !== null && duration >= 0 ? this.display(state) : null;
+    };
+    const item = this.metric(grid, this.t("runtime"), runtime);
+    this.bindings.push(() => { item.hidden = runtime() === null; });
+  }
+
+  caravanGas(parent) {
+    const bottles = this.config.gas_bottles;
+    if (!Array.isArray(bottles) || !bottles.length) return;
+    const section = element("div", undefined, { className: "rv-bottles" });
+    const grid = element("div", undefined, { className: "rv-metrics" });
+    section.append(element("h4", this.t("cylinders")), grid);
+    parent.append(section);
+    const flag = id => this.external(id, "binary_sensor")?.state;
+    const bothCalibrating = () => bottles.length === 2 && bottles.every(bottle => flag(bottle.calibration) === "on");
+    for (const bottle of bottles) {
+      const amount = () => [
+        this.external(bottle.level, "sensor"), this.external(bottle.remaining, "sensor"),
+      ].filter((state, index) => measured(state, index === 0 ? "%" : "kg") !== null);
+      const item = this.metric(grid, bottle.name ?? this.t("gas"), () => {
+        const states = amount();
+        return states.length ? states.map(state => this.display(state)).join(" · ") : this.t("gasMissing");
+      });
+      const details = element("small");
+      item.append(details);
+      this.bindings.push(() => {
+        const status = [];
+        const calibration = flag(bottle.calibration);
+        const error = flag(bottle.error);
+        if (calibration === "on" && !bothCalibrating()) status.push(this.t("calibrate"));
+        if (error === "on") status.push(this.t("gasError"));
+        if (flag(bottle.low) === "on") status.push(this.t("lowGas"));
+        const until = Date.parse(this.external(bottle.empty, "sensor")?.state);
+        if (calibration === "off" && error === "off" && until > Date.now() && amount().length === 2) {
+          const date = new Intl.DateTimeFormat(this.language ? "fi" : "en", { dateStyle: "medium", timeStyle: "short" });
+          status.push(`${this.t("gasEstimate")} · ${date.format(until)}`);
+        }
+        details.textContent = status.join(" · ");
+      });
+    }
+    const note = element("p", label(this.home, ["Both sensors request calibration.", "Molemmat anturit pyytävät kalibrointia." ]), { className: "hint" });
+    section.append(note);
+    this.bindings.push(() => { note.hidden = !bothCalibrating(); });
+  }
+
+  caravanLevelling(parent) {
+    const path = this.config.levelling_path;
+    if (!/^\/(?!\/)[a-z0-9/_-]+$/i.test(path ?? "")) return;
+    const details = this.disclosure(parent, this.t("level"));
+    const short = element("small");
+    details.firstElementChild.append(short);
+    const grid = element("div", undefined, { className: "rv-metrics" });
+    details.append(grid, element("a", label(this.home, ["Open levelling", "Avaa tasausnäkymä"]), { href: path }));
+    const config = this.config.levelling ?? {};
+    const state = key => this.external(config[key], "sensor");
+    const axes = ["lateral", "longitudinal"];
+    for (const key of axes) this.metric(grid, this.t(key), () => this.display(state(key)));
+    this.bindings.push(() => {
+      const session = state("status");
+      short.textContent = session?.state === "idle" ? this.t("notMeasuring") :
+        usable(session) ? this.display(session) : "";
+      const received = Date.parse(state("received")?.state);
+      grid.hidden = session?.state !== "measuring" || !(received <= Date.now())
+        || !(Date.parse(state("expires")?.state) > Date.now())
+        || !axes.every(key => measured(state(key), "mm") !== null);
+    });
   }
 
   energy(parent, privateView) {
